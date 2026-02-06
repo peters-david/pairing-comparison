@@ -1,0 +1,10 @@
+[Unit]
+Description=Pairing Synchronization Service
+After=pairing_deployment.target
+
+[Service]
+Type=simple
+ExecStart=${DIR}/sync.sh
+User=${SCRIPT_USER}
+Restart=always
+RestartSec=60

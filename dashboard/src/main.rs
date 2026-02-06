@@ -1,0 +1,67 @@
+mod components;
+mod hooks;
+mod index_reference;
+mod models;
+mod utils;
+mod wasm;
+
+use yew::prelude::*;
+
+use crate::{
+    components::{
+        plot::ResultFilesPlot, plot_with_settings::PlotWithSettings,
+        single_plot_settings::SinglePlotSettingsComponent,
+    },
+    hooks::use_index::{use_index, use_multiple, use_runs},
+};
+
+#[function_component(App)]
+fn app() -> Html {
+    let runs = use_runs();
+    let selected_run = use_state(|| None::<String>);
+
+    let on_change_selected_run = {
+        let selected_run = selected_run.clone();
+        Callback::from(move |e: Event| {
+            selected_run.set(None);
+            let input = e.target_dyn_into::<web_sys::HtmlSelectElement>();
+            if let Some(s) = input {
+                selected_run.set(Some(s.value()));
+            }
+        })
+    };
+
+    html! {
+        <div>
+            <h1>{"Dashboard"}</h1>
+            {
+                if let Some(r) = (*runs).clone() {
+                    html! {
+                        <select onchange={on_change_selected_run}>
+                            {
+                                r.iter().map(|run| {
+                                    html! {
+                                        <option value={run.clone()}>
+                                            {run}
+                                        </option>
+                                    }
+                                }).collect::<Html>()
+                            }
+                        </select>
+                    }
+                } else {
+                    html! {
+                        <h3>{"Runs not loaded yet"}</h3>
+                    }
+                }
+            }
+            if let Some(s_r) = (*selected_run).clone() {
+                <PlotWithSettings selected_run={s_r.clone()}/>
+            }
+        </div>
+    }
+}
+
+fn main() {
+    yew::Renderer::<App>::new().render();
+}

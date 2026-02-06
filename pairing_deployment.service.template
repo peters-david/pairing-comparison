@@ -1,0 +1,13 @@
+[Unit]
+Description=Pairing Deployment Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=${DIR}/deploy.sh
+Environment=HOME=/root
+Restart=always
+RestartSec=600
+
+[Install]
+WantedBy=multi-user.target

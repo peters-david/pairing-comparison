@@ -1,0 +1,10 @@
+[Unit]
+Description=Pairing Simulation Service
+After=pairing_deployment.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/bash ${DIR}/start.sh
+WorkingDirectory=${DIR}
+Environment="HOME=${USER_HOME}"
+User=${SCRIPT_USER}

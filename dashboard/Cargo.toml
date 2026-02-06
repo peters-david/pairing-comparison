@@ -1,0 +1,17 @@
+[package]
+name = "dashboard"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
+serde-wasm-bindgen = "0.6.5"
+wasm-bindgen = { version = "0.2.108", features = ["serde-serialize"] }
+yew = { version = "0.22.0", features = ["csr"] }
+shared = { path = "../shared" }
+wasm-bindgen-futures = "0.4.58"
+gloo-net = "0.6.0"
+futures = "0.3.31"
+web-sys = { version = "0.3.85", features = ["HtmlSelectElement"] }
+serde_json = "1.0.149"
+indexmap = "2.13.0"
