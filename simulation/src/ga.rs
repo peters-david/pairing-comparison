@@ -149,11 +149,18 @@ pub trait Pairing<I: Individual> {
 
 #[derive(Clone)]
 pub enum Pairings<I: Individual> {
+    // random trying to avoid some duplication by choosing the first parent in order
     OneRandomPairing(OneRandomPairing<I>),
+    // completely random
     TwoRandomPairing(TwoRandomPairing<I>),
+    // only one individual is choosen and recombined with itself
     AsexualPairing(AsexualPairing<I>),
+    // pairs are roughly created out of neighbors
     ThirdFourthNeighborPairing(ThirdFourthNeighborPairing<I>),
+    // individuals are paired with individuals that are closest in fitness
     SimilarFitnessPairing(SimilarFitnessPairing<I>),
+    // individuals with higher fitness are paired more often
+    FitnessProportionatePairing(FitnessProportionatePairing<I>),
 }
 
 #[derive(Clone)]
@@ -171,6 +178,7 @@ impl<I: Individual> Pairing<I> for Pairings<I> {
             Self::AsexualPairing(p) => p.name(),
             Self::ThirdFourthNeighborPairing(p) => p.name(),
             Self::SimilarFitnessPairing(p) => p.name(),
+            Self::FitnessProportionatePairing(p) => p.name(),
         }
     }
 
@@ -181,6 +189,7 @@ impl<I: Individual> Pairing<I> for Pairings<I> {
             Self::AsexualPairing(p) => p.pairing_settings(),
             Self::ThirdFourthNeighborPairing(p) => p.pairing_settings(),
             Self::SimilarFitnessPairing(p) => p.pairing_settings(),
+            Self::FitnessProportionatePairing(p) => p.pairing_settings(),
         }
     }
 
@@ -195,6 +204,7 @@ impl<I: Individual> Pairing<I> for Pairings<I> {
             Self::AsexualPairing(p) => p.pair(individuals_with_fitness, settings),
             Self::ThirdFourthNeighborPairing(p) => p.pair(individuals_with_fitness, settings),
             Self::SimilarFitnessPairing(p) => p.pair(individuals_with_fitness, settings),
+            Self::FitnessProportionatePairing(p) => p.pair(individuals_with_fitness, settings),
         }
     }
 }
@@ -403,7 +413,7 @@ impl<I: Individual> Pairing<I> for SimilarFitnessPairing<I> {
                 .get(first_index)
                 .expect("Index to choose first is out of bounds")
                 .1;
-            let second_index = i % (individuals_with_fitness.len() - 1);
+            let second_index = (i + 1) % (individuals_with_fitness.len() - 1);
             let second = individuals_with_fitness
                 .get(second_index)
                 .expect("Index to choose first is out of bounds")
@@ -463,6 +473,76 @@ impl<I: Individual> Pairing<I> for ThirdFourthNeighborPairing<I> {
                 .get(second_index)
                 .expect("No individual to recombine")
                 .1;
+            pairs.push((first, second));
+        }
+        pairs
+    }
+}
+
+#[derive(Clone)]
+pub struct FitnessProportionatePairing<I: Individual> {
+    pairing_settings: PairingSettings,
+    marker: PhantomData<I>,
+}
+
+impl<I: Individual> FitnessProportionatePairing<I> {
+    pub fn new(pairing_settings: PairingSettings) -> Self {
+        assert!(matches!(
+            pairing_settings,
+            PairingSettings::FitnessProportionatePairing
+        ));
+        Self {
+            pairing_settings,
+            marker: PhantomData,
+        }
+    }
+
+    fn next_to_pair<'a, 'b>(
+        individuals_with_fitness: &'b mut Vec<(f64, &'a I)>,
+    ) -> &'b mut (f64, &'a I) {
+        let next_to_pair: &mut (f64, &I) = individuals_with_fitness
+            .iter_mut()
+            .max_by(|a, b| a.0.total_cmp(&b.0))
+            .expect("Could not get relative fitness max of individuals");
+        next_to_pair
+    }
+}
+
+impl<I: Individual> Pairing<I> for FitnessProportionatePairing<I> {
+    fn name(&self) -> String {
+        "fpp".into()
+    }
+
+    fn pairing_settings(&self) -> PairingSettings {
+        self.pairing_settings.clone()
+    }
+
+    fn pair<'a>(
+        &mut self,
+        mut individuals_with_fitness: Vec<(f64, &'a I)>,
+        settings: &GeneticAlgorithmSettings,
+    ) -> Vec<(&'a I, &'a I)> {
+        assert!(
+            !individuals_with_fitness.is_empty(),
+            "There should be at least one individual"
+        );
+        let size = settings.population_size();
+        let mut pairs = Vec::new();
+        let total_fitness = individuals_with_fitness
+            .iter()
+            .map(|i| i.0)
+            .reduce(|acc, e| acc + e)
+            .expect("Could not sum individuals fitness");
+        individuals_with_fitness
+            .iter_mut()
+            .for_each(|c| *c = (c.0 * 2.0 * size as f64 / total_fitness, c.1));
+        for _ in 0..size {
+            let first_with_fitness = Self::next_to_pair(&mut individuals_with_fitness);
+            first_with_fitness.0 -= 1.0;
+            let first = first_with_fitness.1;
+            let second_with_fitness = Self::next_to_pair(&mut individuals_with_fitness);
+            second_with_fitness.0 -= 1.0;
+            let second = second_with_fitness.1;
             pairs.push((first, second));
         }
         pairs

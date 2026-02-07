@@ -101,6 +101,7 @@ pub enum PairingSettings {
     OneRandomPairing,
     NeighborPairing,
     SimilarFitnessPairing,
+    FitnessProportionatePairing,
 }
 
 impl PairingSettings {
@@ -111,6 +112,7 @@ impl PairingSettings {
             PairingSettings::OneRandomPairing => "orp".to_string(),
             PairingSettings::NeighborPairing => "np".to_string(),
             PairingSettings::SimilarFitnessPairing => "sfp".to_string(),
+            PairingSettings::FitnessProportionatePairing => "fpp".to_string(),
         }
     }
 
@@ -121,6 +123,9 @@ impl PairingSettings {
             PairingSettings::OneRandomPairing => format!("Pairing: OneRandom"),
             PairingSettings::NeighborPairing => format!("Pairing: Neighbor"),
             PairingSettings::SimilarFitnessPairing => format!("Pairing: SimilarFitness"),
+            PairingSettings::FitnessProportionatePairing => {
+                format!("Pairing: FitnessProportionate")
+            }
         }
     }
 }

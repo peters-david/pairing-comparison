@@ -15,8 +15,9 @@ use threadpool::ThreadPool;
 
 use crate::{
     ga::{
-        AsexualPairing, GeneticAlgorithm, Individual, OneRandomPairing, Pairings, Problem,
-        Problems, SimilarFitnessPairing, ThirdFourthNeighborPairing, TwoRandomPairing,
+        AsexualPairing, FitnessProportionatePairing, GeneticAlgorithm, Individual,
+        OneRandomPairing, Pairings, Problem, Problems, SimilarFitnessPairing,
+        ThirdFourthNeighborPairing, TwoRandomPairing,
     },
     synchronization::Semaphore,
 };
@@ -51,7 +52,7 @@ fn main() {
 
     // rofa settings ranges
     // TODO: costs can also be parameterized
-    let nodes = (20..=20).step_by(2);
+    let nodes = (100..=100).step_by(2);
     let links_percentage = (10..=50).step_by(40); // the minimum links required are nodes - 1
     let demands_percentage = (50..=50).step_by(60);
     let link_types = (6..=6).step_by(4);
@@ -83,10 +84,10 @@ fn main() {
     }
 
     // genetic algorithm settings
-    let population_size = vec![50];
+    let population_size = vec![100];
     let survival_rate: Vec<f64> = (1..=9).step_by(4).map(|n| n as f64 * 0.1).collect();
     // TODO: this doesnt neccessarily make sense, depend on difficulty instead
-    let generations = vec![100];
+    let generations = vec![1000];
     let mutation_rate = vec![0.1];
     let mutation_strength = vec![1];
 
@@ -107,6 +108,7 @@ fn main() {
         PairingSettings::OneRandomPairing,
         PairingSettings::NeighborPairing,
         PairingSettings::SimilarFitnessPairing,
+        PairingSettings::FitnessProportionatePairing,
     ];
 
     let m = Arc::new(MultiProgress::with_draw_target(
@@ -193,6 +195,9 @@ fn pairing_from_pairing_settings<I: Individual>(pairing_settings: PairingSetting
         }
         p @ PairingSettings::NeighborPairing => {
             Pairings::ThirdFourthNeighborPairing(ThirdFourthNeighborPairing::new(p))
+        }
+        p @ PairingSettings::FitnessProportionatePairing => {
+            Pairings::FitnessProportionatePairing(FitnessProportionatePairing::new(p))
         }
     }
 }
