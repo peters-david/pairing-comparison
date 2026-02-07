@@ -14,6 +14,7 @@ use crate::{
         use_run::use_run_result_files,
     },
     models::plot_settings::PlotSettings,
+    utils::console::console_error,
 };
 
 #[derive(Properties, PartialEq)]
@@ -30,7 +31,8 @@ pub fn plot_with_settings(props: &PlotWithSettingsProps) -> Html {
 
     {
         let plot_settings = plot_settings.clone();
-        use_effect_with((*run).clone(), |run| {
+        let run = run.clone();
+        use_effect_with((props.selected_run.clone(), run.clone()), move |_| {
             if let Some(r) = (*run).clone() {
                 spawn_local(async move {
                     let loaded_plot_settings =
@@ -107,7 +109,7 @@ pub fn plot_with_settings(props: &PlotWithSettingsProps) -> Html {
                                     html! {}
                                 }
                             }
-                            <SinglePlotSettingsComponent plot_settings={p_s.clone()} update_plot_settings={on_change_plot_settings} />
+                            <SinglePlotSettingsComponent plot_settings={(*p_s).clone()} update_plot_settings={on_change_plot_settings} />
                         </>
                     }
                 } else {

@@ -51,7 +51,7 @@ fn main() {
 
     // rofa settings ranges
     // TODO: costs can also be parameterized
-    let nodes = (100..=100).step_by(2);
+    let nodes = (20..=20).step_by(2);
     let links_percentage = (10..=50).step_by(40); // the minimum links required are nodes - 1
     let demands_percentage = (50..=50).step_by(60);
     let link_types = (6..=6).step_by(4);
@@ -86,7 +86,7 @@ fn main() {
     let population_size = vec![50];
     let survival_rate: Vec<f64> = (1..=9).step_by(4).map(|n| n as f64 * 0.1).collect();
     // TODO: this doesnt neccessarily make sense, depend on difficulty instead
-    let generations = vec![100000];
+    let generations = vec![100];
     let mutation_rate = vec![0.1];
     let mutation_strength = vec![1];
 
@@ -134,35 +134,35 @@ fn main() {
         let overall_progress_bar_handle = overall_progress_bar.clone();
         let m = m.clone();
         pool.set_num_threads(number_cpus());
-        // pool.execute(move || {
-        let progress_bar = m.add(ProgressBar::new(iterations as u64));
-        progress_bar.set_style(
-            ProgressStyle::with_template("{msg:<12} [{bar:100.cyan/blue}] {pos}/{len}")
-                .expect("Could not create progress bar style"),
-        );
-        progress_bar.set_message(format!("{unique_number}"));
+        pool.execute(move || {
+            let progress_bar = m.add(ProgressBar::new(iterations as u64));
+            progress_bar.set_style(
+                ProgressStyle::with_template("{msg:<12} [{bar:100.cyan/blue}] {pos}/{len}")
+                    .expect("Could not create progress bar style"),
+            );
+            progress_bar.set_message(format!("{unique_number}"));
 
-        let mut statistics = Vec::new();
-        for _i in 0..iterations {
-            let p = p.clone();
-            let p_s = p_s.clone();
-            let g_a_s = g_a_s.clone();
-            let statistic = match p {
-                Problems::Tsp(p) => create_pairing_run_genetic_algorithm(p, p_s, g_a_s),
-                Problems::Rofa(p) => create_pairing_run_genetic_algorithm(p, p_s, g_a_s),
-            };
-            statistics.push(statistic);
-            progress_bar.inc(1);
-        }
-        progress_bar.finish_and_clear();
+            let mut statistics = Vec::new();
+            for _i in 0..iterations {
+                let p = p.clone();
+                let p_s = p_s.clone();
+                let g_a_s = g_a_s.clone();
+                let statistic = match p {
+                    Problems::Tsp(p) => create_pairing_run_genetic_algorithm(p, p_s, g_a_s),
+                    Problems::Rofa(p) => create_pairing_run_genetic_algorithm(p, p_s, g_a_s),
+                };
+                statistics.push(statistic);
+                progress_bar.inc(1);
+            }
+            progress_bar.finish_and_clear();
 
-        let statistics = Statistics::from(statistics);
-        let evaluated_statistics = EvaluatedStatistics::from(statistics);
-        evaluated_statistics.save(run_id, unique_number.to_string());
+            let statistics = Statistics::from(statistics);
+            let evaluated_statistics = EvaluatedStatistics::from(statistics);
+            evaluated_statistics.save(run_id, unique_number.to_string());
 
-        overall_progress_bar_handle.inc(1);
-        semaphore.release();
-        // });
+            overall_progress_bar_handle.inc(1);
+            semaphore.release();
+        });
     }
     pool.join();
     overall_progress_bar.finish();

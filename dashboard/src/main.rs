@@ -13,6 +13,7 @@ use crate::{
         single_plot_settings::SinglePlotSettingsComponent,
     },
     hooks::use_index::{use_index, use_multiple, use_runs},
+    utils::console::console_error,
 };
 
 #[function_component(App)]
@@ -23,7 +24,6 @@ fn app() -> Html {
     let on_change_selected_run = {
         let selected_run = selected_run.clone();
         Callback::from(move |e: Event| {
-            selected_run.set(None);
             let input = e.target_dyn_into::<web_sys::HtmlSelectElement>();
             if let Some(s) = input {
                 selected_run.set(Some(s.value()));
@@ -35,9 +35,9 @@ fn app() -> Html {
         <div>
             <h1>{"Dashboard"}</h1>
             {
-                if let Some(r) = (*runs).clone() {
+                if let Some(r) = &*runs {
                     html! {
-                        <select onchange={on_change_selected_run}>
+                        <select value={(*selected_run).clone()} onchange={on_change_selected_run}>
                             {
                                 r.iter().map(|run| {
                                     html! {
@@ -46,6 +46,11 @@ fn app() -> Html {
                                         </option>
                                     }
                                 }).collect::<Html>()
+                            }
+                            {
+                                (selected_run.is_none()).then(||  {
+                                    html! { <option value="">{"Select run..."}</option> }
+                                })
                             }
                         </select>
                     }

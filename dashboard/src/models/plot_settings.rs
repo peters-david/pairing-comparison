@@ -155,6 +155,7 @@ fn convert_map(map: HashMap<String, Converted>) -> IndexMap<String, Sub> {
         };
         index_map.insert(key, sub);
     }
+    index_map.sort_by(|key1, _, key2, _| key1.cmp(key2));
     index_map
 }
 

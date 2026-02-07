@@ -60,14 +60,14 @@ impl<P: Problem<Individual = I>, X: Pairing<I>, I: Individual<Problem = P>>
     }
 
     fn step(&mut self, individuals: Vec<I>) -> Vec<I> {
-        let selected_individuals_with_fitness = self.select(individuals);
+        let selected_individuals_with_fitness = self.select(&individuals);
         let recombined_individuals = self.recombine(selected_individuals_with_fitness);
         let mutated_individuals = self.mutate(recombined_individuals);
         mutated_individuals
     }
 
-    fn select(&mut self, individuals: Vec<I>) -> Vec<(f64, I)> {
-        let mut individuals_and_fitness: Vec<(usize, f64, I)> = individuals
+    fn select<'a>(&mut self, individuals: &'a Vec<I>) -> Vec<(f64, &'a I)> {
+        let mut individuals_and_fitness: Vec<(usize, f64, &I)> = individuals
             .into_iter()
             .enumerate()
             .map(|(i, individual)| (i, self.problem.fitness(&individual), individual))
@@ -93,7 +93,7 @@ impl<P: Problem<Individual = I>, X: Pairing<I>, I: Individual<Problem = P>>
             .collect()
     }
 
-    fn recombine(&mut self, individuals_with_fitness: Vec<(f64, I)>) -> Vec<I> {
+    fn recombine(&mut self, individuals_with_fitness: Vec<(f64, &I)>) -> Vec<I> {
         let pairs = self
             .pairing
             .pair(individuals_with_fitness, &self.genetic_algorithm_settings);
@@ -140,11 +140,11 @@ pub enum Problems {
 pub trait Pairing<I: Individual> {
     fn name(&self) -> String;
     fn pairing_settings(&self) -> PairingSettings;
-    fn pair(
+    fn pair<'a>(
         &mut self,
-        individuals_with_fitness: Vec<(f64, I)>,
+        individuals_with_fitness: Vec<(f64, &'a I)>,
         settings: &GeneticAlgorithmSettings,
-    ) -> Vec<(I, I)>;
+    ) -> Vec<(&'a I, &'a I)>;
 }
 
 #[derive(Clone)]
@@ -184,11 +184,11 @@ impl<I: Individual> Pairing<I> for Pairings<I> {
         }
     }
 
-    fn pair(
+    fn pair<'a>(
         &mut self,
-        individuals_with_fitness: Vec<(f64, I)>,
+        individuals_with_fitness: Vec<(f64, &'a I)>,
         settings: &GeneticAlgorithmSettings,
-    ) -> Vec<(I, I)> {
+    ) -> Vec<(&'a I, &'a I)> {
         match self {
             Self::OneRandomPairing(p) => p.pair(individuals_with_fitness, settings),
             Self::TwoRandomPairing(p) => p.pair(individuals_with_fitness, settings),
@@ -227,11 +227,11 @@ impl<I: Individual> Pairing<I> for OneRandomPairing<I> {
         self.pairing_settings.clone()
     }
 
-    fn pair(
+    fn pair<'a>(
         &mut self,
-        individuals_with_fitness: Vec<(f64, I)>,
+        individuals_with_fitness: Vec<(f64, &'a I)>,
         settings: &GeneticAlgorithmSettings,
-    ) -> Vec<(I, I)> {
+    ) -> Vec<(&'a I, &'a I)> {
         assert!(
             !individuals_with_fitness.is_empty(),
             "There should be at least one individual"
@@ -243,13 +243,11 @@ impl<I: Individual> Pairing<I> for OneRandomPairing<I> {
             let first = individuals_with_fitness
                 .get(first_index)
                 .expect("Index to choose first is out of bounds")
-                .1
-                .clone();
+                .1;
             let second = individuals_with_fitness
                 .choose(&mut rand::rng())
                 .expect("No individual to recombine")
-                .1
-                .clone();
+                .1;
             pairs.push((first, second));
         }
         pairs
@@ -284,11 +282,11 @@ impl<I: Individual> Pairing<I> for TwoRandomPairing<I> {
         self.pairing_settings.clone()
     }
 
-    fn pair(
+    fn pair<'a>(
         &mut self,
-        individuals_with_fitness: Vec<(f64, I)>,
+        individuals_with_fitness: Vec<(f64, &'a I)>,
         settings: &GeneticAlgorithmSettings,
-    ) -> Vec<(I, I)> {
+    ) -> Vec<(&'a I, &'a I)> {
         assert!(
             !individuals_with_fitness.is_empty(),
             "There should be at least one individual"
@@ -299,13 +297,11 @@ impl<I: Individual> Pairing<I> for TwoRandomPairing<I> {
             let first = individuals_with_fitness
                 .choose(&mut rand::rng())
                 .expect("No individual to recombine")
-                .1
-                .clone();
+                .1;
             let second = individuals_with_fitness
                 .choose(&mut rand::rng())
                 .expect("No individual to recombine")
-                .1
-                .clone();
+                .1;
             pairs.push((first, second));
         }
         pairs
@@ -337,11 +333,11 @@ impl<I: Individual> Pairing<I> for AsexualPairing<I> {
         self.pairing_settings.clone()
     }
 
-    fn pair(
+    fn pair<'a>(
         &mut self,
-        individuals_with_fitness: Vec<(f64, I)>,
+        individuals_with_fitness: Vec<(f64, &'a I)>,
         settings: &GeneticAlgorithmSettings,
-    ) -> Vec<(I, I)> {
+    ) -> Vec<(&'a I, &'a I)> {
         assert!(
             !individuals_with_fitness.is_empty(),
             "There should be at least one individual"
@@ -353,9 +349,8 @@ impl<I: Individual> Pairing<I> for AsexualPairing<I> {
             let first = individuals_with_fitness
                 .get(first_index)
                 .expect("Index to choose first is out of bounds")
-                .1
-                .clone();
-            let second = first.clone();
+                .1;
+            let second = first;
             pairs.push((first, second));
         }
         pairs
@@ -390,11 +385,11 @@ impl<I: Individual> Pairing<I> for SimilarFitnessPairing<I> {
         self.pairing_settings.clone()
     }
 
-    fn pair(
+    fn pair<'a>(
         &mut self,
-        mut individuals_with_fitness: Vec<(f64, I)>,
+        mut individuals_with_fitness: Vec<(f64, &'a I)>,
         settings: &GeneticAlgorithmSettings,
-    ) -> Vec<(I, I)> {
+    ) -> Vec<(&'a I, &'a I)> {
         assert!(
             !individuals_with_fitness.is_empty(),
             "There should be at least one individual"
@@ -407,14 +402,12 @@ impl<I: Individual> Pairing<I> for SimilarFitnessPairing<I> {
             let first = individuals_with_fitness
                 .get(first_index)
                 .expect("Index to choose first is out of bounds")
-                .1
-                .clone();
+                .1;
             let second_index = i % (individuals_with_fitness.len() - 1);
             let second = individuals_with_fitness
                 .get(second_index)
                 .expect("Index to choose first is out of bounds")
-                .1
-                .clone();
+                .1;
             pairs.push((first, second));
         }
         pairs
@@ -446,11 +439,11 @@ impl<I: Individual> Pairing<I> for ThirdFourthNeighborPairing<I> {
         self.pairing_settings.clone()
     }
 
-    fn pair(
+    fn pair<'a>(
         &mut self,
-        individuals_with_fitness: Vec<(f64, I)>,
+        individuals_with_fitness: Vec<(f64, &'a I)>,
         settings: &GeneticAlgorithmSettings,
-    ) -> Vec<(I, I)> {
+    ) -> Vec<(&'a I, &'a I)> {
         assert!(
             !individuals_with_fitness.is_empty(),
             "There should be at least one individual"
@@ -462,16 +455,14 @@ impl<I: Individual> Pairing<I> for ThirdFourthNeighborPairing<I> {
             let first = individuals_with_fitness
                 .get(first_index)
                 .expect("Index to choose first is out of bounds")
-                .1
-                .clone();
+                .1;
             let index_distance = rand::random_range(3..=4);
             let second_index =
                 (first_index + index_distance) % (individuals_with_fitness.len() - 1);
             let second = individuals_with_fitness
                 .get(second_index)
                 .expect("No individual to recombine")
-                .1
-                .clone();
+                .1;
             pairs.push((first, second));
         }
         pairs

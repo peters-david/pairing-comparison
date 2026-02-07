@@ -28,7 +28,7 @@ async fn load_files(url: Vec<String>) -> Vec<String> {
     join_all(futures).await
 }
 
-#[derive(Properties, Clone, PartialEq)]
+#[derive(Properties, Clone, PartialEq, Debug)]
 struct ResultFile {
     run: String,
     filename: String,
@@ -62,7 +62,7 @@ impl ResultFile {
     }
 }
 
-#[derive(Properties, Clone, PartialEq)]
+#[derive(Properties, Clone, PartialEq, Debug)]
 pub struct ResultFiles {
     result_files: Vec<ResultFile>,
 }
