@@ -15,9 +15,9 @@ use threadpool::ThreadPool;
 
 use crate::{
     ga::{
-        AsexualPairing, FitnessProportionatePairing, GeneticAlgorithm, Individual,
-        OneRandomPairing, Pairings, Problem, Problems, SimilarFitnessPairing,
-        ThirdFourthNeighborPairing, TwoRandomPairing,
+        AntiElitePairing, AsexualPairing, ElitePairing, FitnessProportionatePairing,
+        GeneticAlgorithm, Individual, OneRandomPairing, Pairings, Problem, Problems,
+        SimilarFitnessPairing, ThirdFourthNeighborPairing, TwoRandomPairing,
     },
     synchronization::Semaphore,
 };
@@ -52,10 +52,10 @@ fn main() {
 
     // rofa settings ranges
     // TODO: costs can also be parameterized
-    let nodes = (100..=100).step_by(2);
+    let nodes = (100..=100).step_by(50);
     let links_percentage = (10..=50).step_by(40); // the minimum links required are nodes - 1
     let demands_percentage = (50..=50).step_by(60);
-    let link_types = (6..=6).step_by(4);
+    let link_types = (4..=8).step_by(4);
 
     // here problemsettings are pushed together
     //let mut problem_settings = Vec::new();
@@ -84,10 +84,10 @@ fn main() {
     }
 
     // genetic algorithm settings
-    let population_size = vec![100];
-    let survival_rate: Vec<f64> = (1..=9).step_by(4).map(|n| n as f64 * 0.1).collect();
+    let population_size = vec![100]; // pair with generations
+    let survival_rate: Vec<f64> = (5..=9).step_by(4).map(|n| n as f64 * 0.1).collect();
     // TODO: this doesnt neccessarily make sense, depend on difficulty instead
-    let generations = vec![1000];
+    let generations = vec![10000];
     let mutation_rate = vec![0.1];
     let mutation_strength = vec![1];
 
@@ -198,6 +198,10 @@ fn pairing_from_pairing_settings<I: Individual>(pairing_settings: PairingSetting
         }
         p @ PairingSettings::FitnessProportionatePairing => {
             Pairings::FitnessProportionatePairing(FitnessProportionatePairing::new(p))
+        }
+        p @ PairingSettings::ElitePairing => Pairings::ElitePairing(ElitePairing::new(p)),
+        p @ PairingSettings::AntiElitePairing => {
+            Pairings::AntiElitePairing(AntiElitePairing::new(p))
         }
     }
 }

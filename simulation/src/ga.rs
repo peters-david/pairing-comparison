@@ -161,6 +161,10 @@ pub enum Pairings<I: Individual> {
     SimilarFitnessPairing(SimilarFitnessPairing<I>),
     // individuals with higher fitness are paired more often
     FitnessProportionatePairing(FitnessProportionatePairing<I>),
+    // all individuals are recombined once and the upper ones fill the remaining populaton
+    ElitePairing(ElitePairing<I>),
+    // all individuals are recombined once and the lower ones fill the remaining populaton
+    AntiElitePairing(AntiElitePairing<I>),
 }
 
 #[derive(Clone)]
@@ -179,6 +183,8 @@ impl<I: Individual> Pairing<I> for Pairings<I> {
             Self::ThirdFourthNeighborPairing(p) => p.name(),
             Self::SimilarFitnessPairing(p) => p.name(),
             Self::FitnessProportionatePairing(p) => p.name(),
+            Self::ElitePairing(p) => p.name(),
+            Self::AntiElitePairing(p) => p.name(),
         }
     }
 
@@ -190,6 +196,8 @@ impl<I: Individual> Pairing<I> for Pairings<I> {
             Self::ThirdFourthNeighborPairing(p) => p.pairing_settings(),
             Self::SimilarFitnessPairing(p) => p.pairing_settings(),
             Self::FitnessProportionatePairing(p) => p.pairing_settings(),
+            Self::ElitePairing(p) => p.pairing_settings(),
+            Self::AntiElitePairing(p) => p.pairing_settings(),
         }
     }
 
@@ -205,6 +213,8 @@ impl<I: Individual> Pairing<I> for Pairings<I> {
             Self::ThirdFourthNeighborPairing(p) => p.pair(individuals_with_fitness, settings),
             Self::SimilarFitnessPairing(p) => p.pair(individuals_with_fitness, settings),
             Self::FitnessProportionatePairing(p) => p.pair(individuals_with_fitness, settings),
+            Self::ElitePairing(p) => p.pair(individuals_with_fitness, settings),
+            Self::AntiElitePairing(p) => p.pair(individuals_with_fitness, settings),
         }
     }
 }
@@ -249,7 +259,7 @@ impl<I: Individual> Pairing<I> for OneRandomPairing<I> {
         let size = settings.population_size();
         let mut pairs = Vec::new();
         for i in 0..size {
-            let first_index = i % (individuals_with_fitness.len() - 1);
+            let first_index = i % individuals_with_fitness.len();
             let first = individuals_with_fitness
                 .get(first_index)
                 .expect("Index to choose first is out of bounds")
@@ -355,7 +365,7 @@ impl<I: Individual> Pairing<I> for AsexualPairing<I> {
         let size = settings.population_size();
         let mut pairs = Vec::new();
         for i in 0..size {
-            let first_index = i % (individuals_with_fitness.len() - 1);
+            let first_index = i % individuals_with_fitness.len();
             let first = individuals_with_fitness
                 .get(first_index)
                 .expect("Index to choose first is out of bounds")
@@ -408,12 +418,12 @@ impl<I: Individual> Pairing<I> for SimilarFitnessPairing<I> {
         let mut pairs = Vec::new();
         individuals_with_fitness.sort_by(|a, b| b.0.total_cmp(&a.0));
         for i in 0..size {
-            let first_index = i % (individuals_with_fitness.len() - 1);
+            let first_index = i % individuals_with_fitness.len();
             let first = individuals_with_fitness
                 .get(first_index)
                 .expect("Index to choose first is out of bounds")
                 .1;
-            let second_index = (i + 1) % (individuals_with_fitness.len() - 1);
+            let second_index = (i + 1) % individuals_with_fitness.len();
             let second = individuals_with_fitness
                 .get(second_index)
                 .expect("Index to choose first is out of bounds")
@@ -461,14 +471,13 @@ impl<I: Individual> Pairing<I> for ThirdFourthNeighborPairing<I> {
         let size = settings.population_size();
         let mut pairs = Vec::new();
         for i in 0..size {
-            let first_index = i % (individuals_with_fitness.len() - 1);
+            let first_index = i % individuals_with_fitness.len();
             let first = individuals_with_fitness
                 .get(first_index)
                 .expect("Index to choose first is out of bounds")
                 .1;
             let index_distance = rand::random_range(3..=4);
-            let second_index =
-                (first_index + index_distance) % (individuals_with_fitness.len() - 1);
+            let second_index = (first_index + index_distance) % individuals_with_fitness.len();
             let second = individuals_with_fitness
                 .get(second_index)
                 .expect("No individual to recombine")
@@ -528,14 +537,15 @@ impl<I: Individual> Pairing<I> for FitnessProportionatePairing<I> {
         );
         let size = settings.population_size();
         let mut pairs = Vec::new();
-        let total_fitness = individuals_with_fitness
+        let total_fitness_absolute = individuals_with_fitness
             .iter()
             .map(|i| i.0)
             .reduce(|acc, e| acc + e)
-            .expect("Could not sum individuals fitness");
+            .expect("Could not sum individuals fitness")
+            .abs();
         individuals_with_fitness
             .iter_mut()
-            .for_each(|c| *c = (c.0 * 2.0 * size as f64 / total_fitness, c.1));
+            .for_each(|c| *c = (c.0 * 2.0 * size as f64 / total_fitness_absolute, c.1));
         for _ in 0..size {
             let first_with_fitness = Self::next_to_pair(&mut individuals_with_fitness);
             first_with_fitness.0 -= 1.0;
@@ -543,6 +553,153 @@ impl<I: Individual> Pairing<I> for FitnessProportionatePairing<I> {
             let second_with_fitness = Self::next_to_pair(&mut individuals_with_fitness);
             second_with_fitness.0 -= 1.0;
             let second = second_with_fitness.1;
+            pairs.push((first, second));
+        }
+        pairs
+    }
+}
+
+#[derive(Clone)]
+pub struct ElitePairing<I: Individual> {
+    pairing_settings: PairingSettings,
+    marker: PhantomData<I>,
+    elite_percentage: usize,
+}
+
+impl<I: Individual> ElitePairing<I> {
+    pub fn new(pairing_settings: PairingSettings) -> Self {
+        assert!(matches!(pairing_settings, PairingSettings::ElitePairing));
+        Self {
+            pairing_settings,
+            marker: PhantomData,
+            elite_percentage: 30,
+        }
+    }
+}
+
+impl<I: Individual> Pairing<I> for ElitePairing<I> {
+    fn name(&self) -> String {
+        "ep".into()
+    }
+
+    fn pairing_settings(&self) -> PairingSettings {
+        self.pairing_settings.clone()
+    }
+
+    fn pair<'a>(
+        &mut self,
+        mut individuals_with_fitness: Vec<(f64, &'a I)>,
+        settings: &GeneticAlgorithmSettings,
+    ) -> Vec<(&'a I, &'a I)> {
+        assert!(
+            !individuals_with_fitness.is_empty(),
+            "There should be at least one individual"
+        );
+        let size = settings.population_size();
+        let mut pairs = Vec::new();
+        for i in (0..individuals_with_fitness.len()).step_by(2) {
+            let first_index = i;
+            let second_index = i + 1;
+            let first = individuals_with_fitness
+                .get(first_index)
+                .expect("Could not get first individual")
+                .1;
+            let second = individuals_with_fitness
+                .get(second_index)
+                .expect("Could not get second individual")
+                .1;
+            pairs.push((first, second));
+        }
+        individuals_with_fitness.sort_by(|a, b| b.0.total_cmp(&a.0));
+        let number_elite =
+            (0.01 * self.elite_percentage as f64 * individuals_with_fitness.len() as f64).ceil()
+                as usize;
+        for i in 0..(size - pairs.len()) {
+            let first_index = i % number_elite;
+            let second_index = (i + 1) % number_elite;
+            let first = individuals_with_fitness
+                .get(first_index)
+                .expect("Could not get first individual")
+                .1;
+            let second = individuals_with_fitness
+                .get(second_index)
+                .expect("Could not get second individual")
+                .1;
+            pairs.push((first, second));
+        }
+        pairs
+    }
+}
+
+#[derive(Clone)]
+pub struct AntiElitePairing<I: Individual> {
+    pairing_settings: PairingSettings,
+    marker: PhantomData<I>,
+    anti_elite_percentage: usize,
+}
+
+impl<I: Individual> AntiElitePairing<I> {
+    pub fn new(pairing_settings: PairingSettings) -> Self {
+        assert!(matches!(
+            pairing_settings,
+            PairingSettings::AntiElitePairing
+        ));
+        Self {
+            pairing_settings,
+            marker: PhantomData,
+            anti_elite_percentage: 30,
+        }
+    }
+}
+
+impl<I: Individual> Pairing<I> for AntiElitePairing<I> {
+    fn name(&self) -> String {
+        "aep".into()
+    }
+
+    fn pairing_settings(&self) -> PairingSettings {
+        self.pairing_settings.clone()
+    }
+
+    fn pair<'a>(
+        &mut self,
+        mut individuals_with_fitness: Vec<(f64, &'a I)>,
+        settings: &GeneticAlgorithmSettings,
+    ) -> Vec<(&'a I, &'a I)> {
+        assert!(
+            !individuals_with_fitness.is_empty(),
+            "There should be at least one individual"
+        );
+        let size = settings.population_size();
+        let mut pairs = Vec::new();
+        for i in (0..individuals_with_fitness.len()).step_by(2) {
+            let first_index = i;
+            let second_index = i + 1;
+            let first = individuals_with_fitness
+                .get(first_index)
+                .expect("Could not get first individual")
+                .1;
+            let second = individuals_with_fitness
+                .get(second_index)
+                .expect("Could not get second individual")
+                .1;
+            pairs.push((first, second));
+        }
+        individuals_with_fitness.sort_by(|a, b| a.0.total_cmp(&b.0));
+        let number_anti_elite =
+            (0.01 * self.anti_elite_percentage as f64 * individuals_with_fitness.len() as f64)
+                .ceil() as usize;
+        for i in 0..(size - pairs.len()) {
+            let first_index = i % number_anti_elite;
+            let second_index = (i + 1) % number_anti_elite;
+            let first = individuals_with_fitness
+                .get(first_index)
+                .expect("Could not get first individual")
+                .1;
+            let second = individuals_with_fitness
+                .get(second_index)
+                .expect("Could not get first individual")
+                .1;
             pairs.push((first, second));
         }
         pairs

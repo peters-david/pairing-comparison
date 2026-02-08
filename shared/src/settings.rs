@@ -102,6 +102,8 @@ pub enum PairingSettings {
     NeighborPairing,
     SimilarFitnessPairing,
     FitnessProportionatePairing,
+    ElitePairing,
+    AntiElitePairing,
 }
 
 impl PairingSettings {
@@ -113,6 +115,8 @@ impl PairingSettings {
             PairingSettings::NeighborPairing => "np".to_string(),
             PairingSettings::SimilarFitnessPairing => "sfp".to_string(),
             PairingSettings::FitnessProportionatePairing => "fpp".to_string(),
+            PairingSettings::ElitePairing => "ep".to_string(),
+            PairingSettings::AntiElitePairing => "aep".to_string(),
         }
     }
 
@@ -126,6 +130,8 @@ impl PairingSettings {
             PairingSettings::FitnessProportionatePairing => {
                 format!("Pairing: FitnessProportionate")
             }
+            PairingSettings::ElitePairing => format!("Pairing: Elite"),
+            PairingSettings::AntiElitePairing => format!("Pairing: AntiElite"),
         }
     }
 }
