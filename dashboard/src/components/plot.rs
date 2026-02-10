@@ -49,7 +49,7 @@ pub fn statistics_plot(props: &StatisticsPlotProps) -> Html {
     {
         let data = data.clone();
         use_effect_with(props.all_statistics.clone(), move |statistics| {
-            console_error(&format!("{}", statistics.len()));
+            console_error(&format!("{:#?}", statistics));
             let traces = statistics
                 .iter()
                 .map(|t| {
@@ -68,14 +68,21 @@ pub fn statistics_plot(props: &StatisticsPlotProps) -> Html {
                     //     r#type: "scatter".to_string(),
                     // };
                     let description = t.settings_description();
-                    let (name_middle, data_middle) = t.fields()[8].clone();
-                    let trace_middle = Trace {
-                        x: (0..data_middle.len()).collect(),
-                        y: data_middle,
+                    let (name, data) = t.fields()[6].clone();
+                    let trace_median = Trace {
+                        x: (0..data.len()).collect(),
+                        y: data,
                         name: description,
                         r#type: "scatter".to_string(),
                     };
-                    vec![trace_middle]
+                    // let (name, data) = t.fields()[12].clone();
+                    // let trace_max = Trace {
+                    //     x: (0..data.len()).collect(),
+                    //     y: data,
+                    //     name: "max: ".to_string() + &description,
+                    //     r#type: "scatter".to_string(),
+                    // };
+                    vec![trace_median]
                 })
                 .collect::<Vec<Vec<Trace>>>()
                 .iter()

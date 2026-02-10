@@ -104,22 +104,12 @@ pub enum PairingSettings {
     FitnessProportionatePairing,
     ElitePairing,
     AntiElitePairing,
+    SpatialDistancePairing {
+        desired_individual_distance_percentage: usize,
+    },
 }
 
 impl PairingSettings {
-    pub fn name(&self) -> String {
-        match self {
-            PairingSettings::AsexualPairing => "ap".to_string(),
-            PairingSettings::TwoRandomPairing => "trp".to_string(),
-            PairingSettings::OneRandomPairing => "orp".to_string(),
-            PairingSettings::NeighborPairing => "np".to_string(),
-            PairingSettings::SimilarFitnessPairing => "sfp".to_string(),
-            PairingSettings::FitnessProportionatePairing => "fpp".to_string(),
-            PairingSettings::ElitePairing => "ep".to_string(),
-            PairingSettings::AntiElitePairing => "aep".to_string(),
-        }
-    }
-
     pub fn description(&self) -> String {
         match self {
             PairingSettings::AsexualPairing => format!("Pairing: Asexual"),
@@ -132,6 +122,12 @@ impl PairingSettings {
             }
             PairingSettings::ElitePairing => format!("Pairing: Elite"),
             PairingSettings::AntiElitePairing => format!("Pairing: AntiElite"),
+            PairingSettings::SpatialDistancePairing {
+                desired_individual_distance_percentage,
+            } => format!(
+                "Pairing: SpatialDistance({})",
+                desired_individual_distance_percentage
+            ),
         }
     }
 }

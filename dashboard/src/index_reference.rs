@@ -145,7 +145,7 @@ fn matches_sub(value: &Value, sub: &Sub) -> bool {
         (Value::Object(map), Sub::SubSettings(settings)) => settings
             .subsettings
             .iter()
-            .all(|(k, s)| map.get(k).map_or(false, |v| matches_sub(v, s))),
+            .all(|(k, s)| map.get(k).map_or(true, |v| matches_sub(v, s))),
         (_, Sub::Variations(variations)) => {
             let key = shallow_json_to_key(value);
             variations.variations.get(&key) == Some(&true)

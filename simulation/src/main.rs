@@ -17,7 +17,8 @@ use crate::{
     ga::{
         AntiElitePairing, AsexualPairing, ElitePairing, FitnessProportionatePairing,
         GeneticAlgorithm, Individual, OneRandomPairing, Pairings, Problem, Problems,
-        SimilarFitnessPairing, ThirdFourthNeighborPairing, TwoRandomPairing,
+        SimilarFitnessPairing, SpatialDistancePairing, ThirdFourthNeighborPairing,
+        TwoRandomPairing,
     },
     synchronization::Semaphore,
 };
@@ -43,19 +44,19 @@ fn main() {
     let run_id = Local::now().format("%Y%m%d%H%M%S").to_string();
 
     // tsp settings ranges
-    let size = (10..=50).step_by(20);
+    let size = (30..=50).step_by(20);
 
     let mut problem_settings = Vec::new();
     for s in size {
-        //problem_settings.push(ProblemSettings::Tsp { size: s });
+        // problem_settings.push(ProblemSettings::Tsp { size: s });
     }
 
     // rofa settings ranges
     // TODO: costs can also be parameterized
     let nodes = (100..=100).step_by(50);
-    let links_percentage = (10..=50).step_by(40); // the minimum links required are nodes - 1
-    let demands_percentage = (50..=50).step_by(60);
-    let link_types = (4..=8).step_by(4);
+    let links_percentage = (30..=30).step_by(40); // the minimum links required are nodes - 1
+    let demands_percentage = (50..=50).step_by(40);
+    let link_types = (8..=8).step_by(4);
 
     // here problemsettings are pushed together
     //let mut problem_settings = Vec::new();
@@ -85,10 +86,10 @@ fn main() {
 
     // genetic algorithm settings
     let population_size = vec![100]; // pair with generations
-    let survival_rate: Vec<f64> = (5..=9).step_by(4).map(|n| n as f64 * 0.1).collect();
+    let survival_rate: Vec<f64> = (5..=5).step_by(4).map(|n| n as f64 * 0.1).collect();
     // TODO: this doesnt neccessarily make sense, depend on difficulty instead
     let generations = vec![10000];
-    let mutation_rate = vec![0.1];
+    let mutation_rate = vec![0.001, 0.01, 0.1];
     let mutation_strength = vec![1];
 
     let mut genetic_algorithm_settings = Vec::new();
@@ -109,6 +110,15 @@ fn main() {
         PairingSettings::NeighborPairing,
         PairingSettings::SimilarFitnessPairing,
         PairingSettings::FitnessProportionatePairing,
+        PairingSettings::SpatialDistancePairing {
+            desired_individual_distance_percentage: 1,
+        },
+        PairingSettings::SpatialDistancePairing {
+            desired_individual_distance_percentage: 10,
+        },
+        PairingSettings::SpatialDistancePairing {
+            desired_individual_distance_percentage: 100,
+        },
     ];
 
     let m = Arc::new(MultiProgress::with_draw_target(
@@ -124,7 +134,7 @@ fn main() {
     overall_progress_bar.set_style(style.clone());
     overall_progress_bar.set_message("Overall");
 
-    let max_queued_tasks = 100;
+    let max_queued_tasks = number_cpus() + 1;
     let semaphore = Arc::new(Semaphore::new(max_queued_tasks));
 
     for (unique_number, (g_a_s, p_s, p)) in
@@ -203,5 +213,8 @@ fn pairing_from_pairing_settings<I: Individual>(pairing_settings: PairingSetting
         p @ PairingSettings::AntiElitePairing => {
             Pairings::AntiElitePairing(AntiElitePairing::new(p))
         }
+        p @ PairingSettings::SpatialDistancePairing {
+            desired_individual_distance_percentage,
+        } => Pairings::SpatialDistancePairing(SpatialDistancePairing::new(p)),
     }
 }

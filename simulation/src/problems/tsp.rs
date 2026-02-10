@@ -5,7 +5,7 @@ use rand::seq::{IteratorRandom, SliceRandom};
 use shared::settings::ProblemSettings;
 
 use crate::{
-    ga::{Individual, Problem},
+    ga::{get_id, Id, Individual, Problem},
     point::Point,
 };
 
@@ -75,13 +75,21 @@ impl Problem for Cities {
 #[derive(Debug, Clone)]
 pub struct Sequence {
     numbers: Vec<usize>,
+    id: Id,
+    parent_ids: Option<(Id, Id)>,
 }
 
 impl Sequence {
     pub fn random(size: usize) -> Self {
         let mut numbers = (0..size).collect::<Vec<usize>>();
         numbers.shuffle(&mut rand::rng());
-        Self { numbers }
+        let id = get_id();
+        let parent_ids = None;
+        Self {
+            numbers,
+            id,
+            parent_ids,
+        }
     }
 
     fn len(&self) -> usize {
@@ -171,8 +179,12 @@ impl Individual for Sequence {
                 .len()
                 == size
         );
+        let id = get_id();
+        let parent_ids = Some((first.id(), second.id()));
         Self {
             numbers: new_numbers,
+            id,
+            parent_ids,
         }
     }
 
@@ -182,5 +194,13 @@ impl Individual for Sequence {
             let swap_indices = (0..self.len()).choose_multiple(&mut rand::rng(), 2);
             self.numbers.swap(swap_indices[0], swap_indices[1]);
         }
+    }
+
+    fn id(&self) -> Id {
+        self.id
+    }
+
+    fn parent_ids(&self) -> (Id, Id) {
+        self.parent_ids.expect("No parent found")
     }
 }

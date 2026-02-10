@@ -8,7 +8,7 @@ use std::{
 
 use shared::settings::ProblemSettings;
 
-use crate::ga::{Individual, Problem};
+use crate::ga::{get_id, Individual, Problem};
 
 type Id = usize;
 
@@ -633,6 +633,8 @@ pub struct RoutingAndCapacityPlan {
     routing_plan: RoutingPlan,
     capacity_plan: CapacityPlan,
     links_demands: Vec<usize>,
+    id: Id,
+    parent_ids: Option<(Id, Id)>,
 }
 
 impl RoutingAndCapacityPlan {
@@ -644,10 +646,14 @@ impl RoutingAndCapacityPlan {
             problem.network.links.len(),
         );
         let links_demands = Self::calculate_links_demands(problem, &routing_plan);
+        let id = get_id();
+        let parent_ids = None;
         Self {
             routing_plan,
             capacity_plan,
             links_demands,
+            id,
+            parent_ids,
         }
     }
 
@@ -685,16 +691,28 @@ impl Individual for RoutingAndCapacityPlan {
         let routing_plan = RoutingPlan::crossover(&first.routing_plan, &second.routing_plan);
         let capacity_plan = CapacityPlan::crossover(&first.capacity_plan, &second.capacity_plan);
         let links_demands = RoutingAndCapacityPlan::calculate_links_demands(problem, &routing_plan);
+        let id = get_id();
+        let parent_ids = Some((first.id(), second.id()));
         Self {
             routing_plan,
             capacity_plan,
             links_demands,
+            id,
+            parent_ids,
         }
     }
 
     fn mutate(&mut self, problem: &Self::Problem) {
         self.routing_plan.mutate(problem);
         self.capacity_plan.mutate(self.get_links_demands(), problem);
+    }
+
+    fn id(&self) -> Id {
+        self.id
+    }
+
+    fn parent_ids(&self) -> (Id, Id) {
+        self.parent_ids.expect("Individuals has no parent ids")
     }
 }
 

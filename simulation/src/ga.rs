@@ -1,4 +1,9 @@
-use std::{any::Any, marker::PhantomData};
+use std::{
+    any::Any,
+    collections::HashMap,
+    marker::PhantomData,
+    sync::atomic::{AtomicU64, Ordering},
+};
 
 use rand::{seq::IndexedRandom, Rng};
 use shared::{
@@ -10,6 +15,13 @@ use crate::problems::{
     rofa::{Rofa, RoutingAndCapacityPlan},
     tsp::{Cities, Sequence},
 };
+
+pub type Id = usize;
+static ID: AtomicU64 = AtomicU64::new(0);
+
+pub fn get_id() -> Id {
+    ID.fetch_add(1, Ordering::Relaxed) as usize
+}
 
 pub struct GeneticAlgorithm<P: Problem<Individual = I>, X: Pairing<I>, I: Individual<Problem = P>> {
     problem: P,
@@ -42,13 +54,8 @@ impl<P: Problem<Individual = I>, X: Pairing<I>, I: Individual<Problem = P>>
     }
 
     pub fn run(&mut self) {
-        //TODO: currently all starting individuals are the same
-        //let mut individuals = (0..self.settings.population_size())
-        //    .map(|_| self.problem.random_individual())
-        //    .collect();
-        let individual = self.problem.random_individual();
         let mut individuals = (0..self.genetic_algorithm_settings.population_size())
-            .map(|_| individual.clone())
+            .map(|_| self.problem.random_individual())
             .collect();
         for generation in 0..self.genetic_algorithm_settings.generations() {
             individuals = self.step(individuals);
@@ -121,6 +128,8 @@ pub trait Individual: Any + Clone {
     type Problem: Problem<Individual = Self>;
     fn crossover(first: &Self, second: &Self, problem: &Self::Problem) -> Self;
     fn mutate(&mut self, problem: &Self::Problem);
+    fn id(&self) -> Id;
+    fn parent_ids(&self) -> (Id, Id);
 }
 
 pub trait Problem {
@@ -138,7 +147,6 @@ pub enum Problems {
 }
 
 pub trait Pairing<I: Individual> {
-    fn name(&self) -> String;
     fn pairing_settings(&self) -> PairingSettings;
     fn pair<'a>(
         &mut self,
@@ -165,6 +173,8 @@ pub enum Pairings<I: Individual> {
     ElitePairing(ElitePairing<I>),
     // all individuals are recombined once and the lower ones fill the remaining populaton
     AntiElitePairing(AntiElitePairing<I>),
+    // pairing based on spatial distance
+    SpatialDistancePairing(SpatialDistancePairing<I, 2>),
 }
 
 #[derive(Clone)]
@@ -175,19 +185,6 @@ pub enum ConstructedPairing {
 
 // TODO: this feels wrong, but seems to be the best choice in rust
 impl<I: Individual> Pairing<I> for Pairings<I> {
-    fn name(&self) -> String {
-        match self {
-            Self::OneRandomPairing(p) => p.name(),
-            Self::TwoRandomPairing(p) => p.name(),
-            Self::AsexualPairing(p) => p.name(),
-            Self::ThirdFourthNeighborPairing(p) => p.name(),
-            Self::SimilarFitnessPairing(p) => p.name(),
-            Self::FitnessProportionatePairing(p) => p.name(),
-            Self::ElitePairing(p) => p.name(),
-            Self::AntiElitePairing(p) => p.name(),
-        }
-    }
-
     fn pairing_settings(&self) -> PairingSettings {
         match self {
             Self::OneRandomPairing(p) => p.pairing_settings(),
@@ -198,6 +195,7 @@ impl<I: Individual> Pairing<I> for Pairings<I> {
             Self::FitnessProportionatePairing(p) => p.pairing_settings(),
             Self::ElitePairing(p) => p.pairing_settings(),
             Self::AntiElitePairing(p) => p.pairing_settings(),
+            Self::SpatialDistancePairing(p) => p.pairing_settings(),
         }
     }
 
@@ -215,6 +213,7 @@ impl<I: Individual> Pairing<I> for Pairings<I> {
             Self::FitnessProportionatePairing(p) => p.pair(individuals_with_fitness, settings),
             Self::ElitePairing(p) => p.pair(individuals_with_fitness, settings),
             Self::AntiElitePairing(p) => p.pair(individuals_with_fitness, settings),
+            Self::SpatialDistancePairing(p) => p.pair(individuals_with_fitness, settings),
         }
     }
 }
@@ -239,10 +238,6 @@ impl<I: Individual> OneRandomPairing<I> {
 }
 
 impl<I: Individual> Pairing<I> for OneRandomPairing<I> {
-    fn name(&self) -> String {
-        "orp".into()
-    }
-
     fn pairing_settings(&self) -> PairingSettings {
         self.pairing_settings.clone()
     }
@@ -294,10 +289,6 @@ impl<I: Individual> TwoRandomPairing<I> {
 }
 
 impl<I: Individual> Pairing<I> for TwoRandomPairing<I> {
-    fn name(&self) -> String {
-        "trp".into()
-    }
-
     fn pairing_settings(&self) -> PairingSettings {
         self.pairing_settings.clone()
     }
@@ -345,10 +336,6 @@ impl<I: Individual> AsexualPairing<I> {
 }
 
 impl<I: Individual> Pairing<I> for AsexualPairing<I> {
-    fn name(&self) -> String {
-        "ap".into()
-    }
-
     fn pairing_settings(&self) -> PairingSettings {
         self.pairing_settings.clone()
     }
@@ -397,10 +384,6 @@ impl<I: Individual> SimilarFitnessPairing<I> {
 }
 
 impl<I: Individual> Pairing<I> for SimilarFitnessPairing<I> {
-    fn name(&self) -> String {
-        "sfp".to_string()
-    }
-
     fn pairing_settings(&self) -> PairingSettings {
         self.pairing_settings.clone()
     }
@@ -451,10 +434,6 @@ impl<I: Individual> ThirdFourthNeighborPairing<I> {
 }
 
 impl<I: Individual> Pairing<I> for ThirdFourthNeighborPairing<I> {
-    fn name(&self) -> String {
-        "tfnp".into()
-    }
-
     fn pairing_settings(&self) -> PairingSettings {
         self.pairing_settings.clone()
     }
@@ -518,10 +497,6 @@ impl<I: Individual> FitnessProportionatePairing<I> {
 }
 
 impl<I: Individual> Pairing<I> for FitnessProportionatePairing<I> {
-    fn name(&self) -> String {
-        "fpp".into()
-    }
-
     fn pairing_settings(&self) -> PairingSettings {
         self.pairing_settings.clone()
     }
@@ -578,10 +553,6 @@ impl<I: Individual> ElitePairing<I> {
 }
 
 impl<I: Individual> Pairing<I> for ElitePairing<I> {
-    fn name(&self) -> String {
-        "ep".into()
-    }
-
     fn pairing_settings(&self) -> PairingSettings {
         self.pairing_settings.clone()
     }
@@ -653,10 +624,6 @@ impl<I: Individual> AntiElitePairing<I> {
 }
 
 impl<I: Individual> Pairing<I> for AntiElitePairing<I> {
-    fn name(&self) -> String {
-        "aep".into()
-    }
-
     fn pairing_settings(&self) -> PairingSettings {
         self.pairing_settings.clone()
     }
@@ -703,5 +670,182 @@ impl<I: Individual> Pairing<I> for AntiElitePairing<I> {
             pairs.push((first, second));
         }
         pairs
+    }
+}
+
+#[derive(Clone)]
+pub struct SpatialDistancePairing<I: Individual, const DIMENSIONS: usize> {
+    pairing_settings: PairingSettings,
+    marker: PhantomData<I>,
+    desired_individual_distance_percentage: usize,
+    space: Option<Space<DIMENSIONS>>,
+}
+
+impl<I: Individual, const DIMENSIONS: usize> SpatialDistancePairing<I, DIMENSIONS> {
+    pub fn new(pairing_settings: PairingSettings) -> Self {
+        let desired_individual_distance_percentage = match pairing_settings {
+            PairingSettings::SpatialDistancePairing {
+                desired_individual_distance_percentage,
+            } => desired_individual_distance_percentage,
+            _ => panic!("Invalid pairing settings"),
+        };
+        Self {
+            pairing_settings,
+            marker: PhantomData,
+            desired_individual_distance_percentage,
+            space: None,
+        }
+    }
+}
+
+impl<I: Individual, const DIMENSIONS: usize> Pairing<I> for SpatialDistancePairing<I, DIMENSIONS> {
+    fn pairing_settings(&self) -> PairingSettings {
+        self.pairing_settings.clone()
+    }
+
+    fn pair<'a>(
+        &mut self,
+        mut individuals_with_fitness: Vec<(f64, &'a I)>,
+        settings: &GeneticAlgorithmSettings,
+    ) -> Vec<(&'a I, &'a I)> {
+        assert!(
+            !individuals_with_fitness.is_empty(),
+            "There should be at least one individual"
+        );
+        self.space = match &mut self.space {
+            None => {
+                let ids = individuals_with_fitness.iter().map(|i| i.1.id()).collect();
+                Some(Space::new_at_origin(ids))
+            }
+            Some(s) => {
+                let id_relationships = individuals_with_fitness
+                    .iter()
+                    .map(|i| (i.1.id(), i.1.parent_ids()))
+                    .collect();
+                Some(s.updated_from_id_relationships(id_relationships))
+            }
+        };
+        let size = settings.population_size();
+        let mut pairs = Vec::new();
+        for i in 0..size {
+            let first_index = i % individuals_with_fitness.len();
+            let first_individual = individuals_with_fitness
+                .get(first_index)
+                .expect("Could not get first individual from index")
+                .1;
+            let desired_individual_distance_number = 1
+                + (0.01
+                    * self.desired_individual_distance_percentage as f64
+                    * (individuals_with_fitness.len() as f64 - 2.0)) as usize;
+            let second_id = &self
+                .space
+                .as_ref()
+                .expect("There should be a space available")
+                .get_id_of_close_individual(
+                    first_individual.id(),
+                    desired_individual_distance_number,
+                );
+            let second_individual = individuals_with_fitness
+                .iter()
+                .find(|(_, i)| i.id() == *second_id)
+                .expect("Could not find individual by id")
+                .1;
+            pairs.push((first_individual, second_individual));
+        }
+        pairs
+    }
+}
+
+#[derive(Clone, Debug)]
+struct Position<const N: usize> {
+    coordinates: Vec<f64>,
+}
+
+impl<const N: usize> Position<N> {
+    fn origin() -> Self {
+        let coordinates = vec![0.0; N];
+        Self { coordinates }
+    }
+
+    fn middle(first: &Self, second: &Self) -> Self {
+        let mut new_coordinates = Vec::new();
+        for (first_coordinate, second_coordinate) in
+            first.coordinates.iter().zip(&second.coordinates)
+        {
+            let new_coordinate = (first_coordinate + second_coordinate) / 2.0;
+            new_coordinates.push(new_coordinate);
+        }
+        Self {
+            coordinates: new_coordinates,
+        }
+    }
+
+    fn distance(first: &Self, second: &Self) -> f64 {
+        let squared_distance: f64 = first
+            .coordinates
+            .iter()
+            .zip(&second.coordinates)
+            .map(|(f_c, s_c)| (f_c - s_c).powi(2))
+            .sum();
+        squared_distance.sqrt()
+    }
+}
+
+#[derive(Clone, Debug)]
+struct Space<const N: usize> {
+    positions: HashMap<Id, Position<N>>,
+}
+
+impl<const N: usize> Space<N> {
+    fn new_at_origin(ids: Vec<Id>) -> Self {
+        let mut positions = HashMap::new();
+        for id in ids {
+            positions.insert(id, Position::origin());
+        }
+        Self { positions }
+    }
+
+    pub fn updated_from_id_relationships(&mut self, id_relationships: Vec<(Id, (Id, Id))>) -> Self {
+        let mut new_positions = HashMap::new();
+        for (child_id, (first_parent_id, second_parent_id)) in id_relationships {
+            let first_position = self
+                .positions
+                .get(&first_parent_id)
+                .expect("First position not found in space");
+            let second_position = self
+                .positions
+                .get(&second_parent_id)
+                .expect("Second position not found in space");
+            let new_position = Position::middle(first_position, second_position);
+            new_positions.insert(child_id, new_position);
+        }
+        Self {
+            positions: new_positions,
+        }
+    }
+
+    fn get_id_of_close_individual(
+        &self,
+        individual_id: Id,
+        desired_individual_distance_number: usize,
+    ) -> Id {
+        let position_individual = self
+            .positions
+            .get(&individual_id)
+            .expect("Individual not in space positions");
+        let mut distances_and_ids = Vec::new();
+        for (&id_other, position_other) in &self.positions {
+            let distance = Position::distance(position_individual, position_other);
+            distances_and_ids.push((distance, id_other));
+        }
+        distances_and_ids.sort_by(|a, b| {
+            a.0.partial_cmp(&b.0)
+                .expect("Could not order ids by distance")
+        });
+        assert!(!distances_and_ids.is_empty(), "Distances can not be empty");
+        distances_and_ids
+            .get(desired_individual_distance_number)
+            .expect("Could not get individual with desired spatial distance")
+            .1
     }
 }
