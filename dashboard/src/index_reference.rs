@@ -7,7 +7,7 @@ use std::collections::HashSet;
 use web_sys::console;
 use yew::Properties;
 
-use crate::models::plot_settings::{PlotSettings, Sub, SubSettings};
+use crate::models::plot_settings::PlotSettings;
 
 // TODO: maybe handle file loading errors better
 async fn load_files(url: Vec<String>) -> Vec<String> {
@@ -119,47 +119,10 @@ impl ResultFiles {
     pub async fn load_by_settings(&self, settings: PlotSettings) -> Vec<EvaluatedStatistics> {
         let all = self.load_strings().await;
         let all_raw = all
-            .iter()
-            .filter(|s| complies_with(s, &settings))
-            .map(|s| EvaluatedStatistics::from_string(s))
+            .into_iter()
+            .filter(|s| PlotSettings::from_result_file_content(s.clone()).complies_with(&settings))
+            .map(|s| EvaluatedStatistics::from_string(&s))
             .collect();
         all_raw
-    }
-}
-
-fn complies_with(statistics_raw: &str, plot_settings: &PlotSettings) -> bool {
-    let statistics: Value = match serde_json::from_str(statistics_raw) {
-        Ok(v) => v,
-        Err(_) => return false,
-    };
-    matches_sub(
-        &statistics,
-        &Sub::SubSettings(SubSettings {
-            subsettings: plot_settings.settings_map.clone(),
-        }),
-    )
-}
-
-fn matches_sub(value: &Value, sub: &Sub) -> bool {
-    match (value, sub) {
-        (Value::Object(map), Sub::SubSettings(settings)) => settings
-            .subsettings
-            .iter()
-            .all(|(k, s)| map.get(k).map_or(true, |v| matches_sub(v, s))),
-        (_, Sub::Variations(variations)) => {
-            let key = shallow_json_to_key(value);
-            variations.variations.get(&key) == Some(&true)
-        }
-        _ => false,
-    }
-}
-
-fn shallow_json_to_key(value: &Value) -> String {
-    match value {
-        Value::Null => panic!("No null should be in json file"),
-        Value::Bool(b) => b.to_string(),
-        Value::Number(n) => n.to_string(),
-        Value::String(s) => s.to_string(),
-        _ => panic!("Expected shallow json"),
     }
 }
