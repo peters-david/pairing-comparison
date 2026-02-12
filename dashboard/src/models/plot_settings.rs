@@ -4,6 +4,8 @@ use indexmap::IndexMap;
 use serde_json::{Value, from_str};
 use yew::Properties;
 
+use crate::utils::console::console_error;
+
 #[derive(Properties, Debug, PartialEq, Clone)]
 pub struct PlotSettings {
     pub settings_map: IndexMap<Vec<String>, bool>,
@@ -12,8 +14,8 @@ pub struct PlotSettings {
 impl PlotSettings {
     pub fn from_result_files_content(files_content: Vec<String>) -> Self {
         let mut paths = HashSet::new();
-        for file_content in files_content {
-            let mut value: Value = from_str(&file_content).expect("Could not parse json file");
+        for file_content in &files_content {
+            let mut value: Value = from_str(file_content).expect("Could not parse json file");
             // remove the fitness traces
             value
                 .as_object_mut()
@@ -25,6 +27,9 @@ impl PlotSettings {
         let mut settings_map = IndexMap::new();
         for path in paths {
             settings_map.insert(path, false);
+        }
+        if files_content.len() > 1 {
+            console_error(&format!("{:#?}", &settings_map));
         }
         Self { settings_map }
     }
