@@ -26,12 +26,31 @@ impl PlotSettings {
         }
         let mut settings_map = IndexMap::new();
         for path in paths {
-            settings_map.insert(path, false);
+            settings_map.insert(path, true);
         }
         if files_content.len() > 1 {
             console_error(&format!("{:#?}", &settings_map));
         }
         Self { settings_map }
+    }
+
+    pub fn get_first_paths(&self, current_path: &Vec<String>) -> Vec<String> {
+        let mut first_paths_unique = HashSet::new();
+        for (path, _) in &self.settings_map {
+            if path.len() > current_path.len() && path.starts_with(current_path) {
+                first_paths_unique.insert(path[current_path.len()].clone());
+            }
+        }
+        let mut first_paths = first_paths_unique.into_iter().collect::<Vec<String>>();
+        first_paths.sort();
+        first_paths
+    }
+
+    pub fn is_checked(&self, path: &Vec<String>) -> bool {
+        *self
+            .settings_map
+            .get(path)
+            .expect("Gave non-existent path in plot settings")
     }
 
     pub fn paths(&self) -> Vec<Vec<String>> {
