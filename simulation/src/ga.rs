@@ -5,7 +5,8 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 
-use rand::{seq::IndexedRandom, Rng};
+use rand::{prelude::*, rng, seq::IndexedRandom};
+use rand_distr::{Distribution, Normal};
 use shared::{
     settings::{GeneticAlgorithmSettings, PairingSettings, ProblemSettings},
     statistics::Statistic,
@@ -767,6 +768,10 @@ impl<const N: usize> Position<N> {
         Self { coordinates }
     }
 
+    fn from_coordinates(coordinates: Vec<f64>) -> Self {
+        Self { coordinates }
+    }
+
     fn middle(first: &Self, second: &Self) -> Self {
         let mut new_coordinates = Vec::new();
         for (first_coordinate, second_coordinate) in
@@ -778,6 +783,34 @@ impl<const N: usize> Position<N> {
         Self {
             coordinates: new_coordinates,
         }
+    }
+
+    fn normalize(mut self) -> Self {
+        let length = self.coordinates.iter().map(|v| v * v).sum::<f64>().sqrt();
+        for v in &mut self.coordinates {
+            *v /= length;
+        }
+        self
+    }
+
+    fn mutate(self) -> Self {
+        let mut rng = rng();
+        let normal = Normal::new(0.0, 1.0).expect("Could not create normal");
+        let mutation_coordinates: Vec<f64> = (0..N)
+            .map(|_| normal.sample(&mut rng))
+            .collect::<Vec<f64>>();
+        let mutation = Self::from_coordinates(mutation_coordinates).normalize();
+        Self::sum(self, mutation)
+    }
+
+    fn sum(first: Self, second: Self) -> Self {
+        let coordinates = first
+            .coordinates
+            .iter()
+            .zip(second.coordinates)
+            .map(|(f, s)| f + s)
+            .collect();
+        Self { coordinates }
     }
 
     fn distance(first: &Self, second: &Self) -> f64 {
@@ -816,7 +849,7 @@ impl<const N: usize> Space<N> {
                 .positions
                 .get(&second_parent_id)
                 .expect("Second position not found in space");
-            let new_position = Position::middle(first_position, second_position);
+            let new_position = Position::middle(first_position, second_position).mutate();
             new_positions.insert(child_id, new_position);
         }
         Self {

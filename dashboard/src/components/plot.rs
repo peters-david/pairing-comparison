@@ -68,10 +68,10 @@ pub fn statistics_plot(props: &StatisticsPlotProps) -> Html {
                     //     r#type: "scatter".to_string(),
                     // };
                     let description = t.settings_description();
-                    let (name, data) = t.fields()[6].clone();
+                    let (x, y) = t.x_y();
                     let trace_median = Trace {
-                        x: (0..data.len()).collect(),
-                        y: data,
+                        x,
+                        y,
                         name: description,
                         r#type: "scatter".to_string(),
                     };

@@ -49,6 +49,13 @@ impl EvaluatedStatistics {
             + &self.problem_settings.description()
     }
 
+    pub fn x_y(&self) -> (Vec<usize>, Vec<f64>) {
+        let population_size = self.genetic_algorithm_settings.population_size();
+        let y = self.evaluated_traces.average_of_median.clone();
+        let x = (0..y.len()).map(|s| s * population_size).collect();
+        (x, y)
+    }
+
     // TODO: improve
     pub fn fields(&self) -> Vec<(String, Vec<f64>)> {
         self.evaluated_traces.fields()

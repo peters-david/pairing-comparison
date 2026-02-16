@@ -95,16 +95,14 @@ enum Link {}
 struct UnidirectionalDemand {}
 enum Demand {}
 
-const MAX_TRAFFIC_DEMAND: usize = 10;
-
 #[derive(Debug, Clone)]
 struct BidirectionalDemand {
     demand_nodes: (Id, Id),
-    required_traffic: usize,
+    required_traffic: f64,
 }
 
 impl BidirectionalDemand {
-    fn between_with_traffic(demand_nodes: (Id, Id), required_traffic: usize) -> Self {
+    fn between_with_traffic(demand_nodes: (Id, Id), required_traffic: f64) -> Self {
         assert!(
             demand_nodes.0 != demand_nodes.1,
             "Cannot demand traffic from node to itself"
@@ -139,7 +137,7 @@ impl BidirectionalDemand {
                     rng.random_range(0..number_nodes),
                 );
             }
-            let required_traffic = rng.random_range(0..=MAX_TRAFFIC_DEMAND);
+            let required_traffic = rng.random_range(0.0..=1.0);
             demands.push(BidirectionalDemand::between_with_traffic(
                 between,
                 required_traffic,
@@ -274,17 +272,18 @@ impl Network {
 
 #[derive(Debug, Clone)]
 struct CapacityType {
-    capacity: usize,
+    capacity: f64,
     fixed_cost: f64,
     variable_cost: f64,
 }
 
 impl CapacityType {
-    fn from_percentage(percentage: f64) -> Self {
-        let multiplier = (percentage * 10.0) as usize;
-        let capacity = 10u32.pow(3 + multiplier as u32) as usize;
-        let fixed_cost = 0.05 * multiplier as f64;
-        let variable_cost = 1.0 / (multiplier + 1) as f64;
+    fn from_percentage(percentage: f64, number_demands: usize, number_links: usize) -> Self {
+        let max_capacity = number_demands as f64; // maximum demand of 1.0
+        let capacity = percentage * max_capacity;
+        let max_fixed_cost = 1.0 / number_links as f64;
+        let fixed_cost = percentage * max_fixed_cost; // in range [0,1]
+        let variable_cost = fixed_cost;
         Self {
             capacity,
             fixed_cost,
@@ -299,9 +298,15 @@ struct CapacityTypes {
 }
 
 impl CapacityTypes {
-    fn random(number: usize) -> Self {
+    fn random(number: usize, number_demands: usize, number_links: usize) -> Self {
         let capacity_types = (1..=number)
-            .map(|n| CapacityType::from_percentage(n as f64 / number as f64))
+            .map(|n| {
+                CapacityType::from_percentage(
+                    n as f64 / number as f64,
+                    number_demands,
+                    number_links,
+                )
+            })
             .collect();
         Self { capacity_types }
     }
@@ -354,7 +359,7 @@ impl Rofa {
             + demands_min;
         let network = Network::random(number_nodes, number_links);
         let demands = BidirectionalDemand::random_demands(number_nodes, number_demands);
-        let capacity_types = CapacityTypes::random(number_link_types);
+        let capacity_types = CapacityTypes::random(number_link_types, number_demands, number_links);
         Self {
             network,
             demands,
@@ -381,17 +386,24 @@ impl Rofa {
                 planned_capacity_type.capacity > total_demand,
                 "{cap} vs {total_demand} Demand cannot be bigger than capacity"
             );
-            let delay =
-                total_demand as f64 / (planned_capacity_type.capacity - total_demand) as f64;
+
+            let delay = total_demand
+                * (total_demand / planned_capacity_type.capacity).powi(CONGESTION_EXPONENT);
+
             unweighted_delay_cost += delay;
             fixed_cost += planned_capacity_type.fixed_cost;
-            variable_cost += (total_demand as f64) * planned_capacity_type.variable_cost;
+            variable_cost += total_demand * planned_capacity_type.variable_cost;
         }
-        let delay_cost = DELAY_COST_COEFFICIENT * unweighted_delay_cost;
+        let number_links = all_links_demands.len();
+        let delay_cost =
+            (unweighted_delay_cost / (number_links as f64)).powf(DELAY_SCALING_EXPONENT);
 
         delay_cost + fixed_cost + variable_cost
     }
 }
+
+const DELAY_SCALING_EXPONENT: f64 = 1.0 / 5.0;
+const CONGESTION_EXPONENT: i32 = 3;
 
 impl Problem for Rofa {
     type Individual = RoutingAndCapacityPlan;
@@ -415,8 +427,6 @@ impl Problem for Rofa {
         self.problem_settings.clone()
     }
 }
-
-const DELAY_COST_COEFFICIENT: f64 = 100000000.0;
 
 type Route = Vec<Id>;
 
@@ -603,7 +613,7 @@ impl CapacityPlan {
         }
     }
 
-    fn mutate(&mut self, min_capacities: Vec<usize>, problem: &Rofa) {
+    fn mutate(&mut self, min_capacities: Vec<f64>, problem: &Rofa) {
         let length = self.planned_capacity_types.len();
         let mut rng = rand::rng();
         let index_to_mutate = (0..length)
@@ -632,7 +642,7 @@ impl CapacityPlan {
 pub struct RoutingAndCapacityPlan {
     routing_plan: RoutingPlan,
     capacity_plan: CapacityPlan,
-    links_demands: Vec<usize>,
+    links_demands: Vec<f64>,
     id: Id,
     parent_ids: Option<(Id, Id)>,
 }
@@ -657,16 +667,16 @@ impl RoutingAndCapacityPlan {
         }
     }
 
-    pub fn get_links_demands(&self) -> Vec<usize> {
+    pub fn get_links_demands(&self) -> Vec<f64> {
         self.links_demands.clone()
     }
 
-    fn calculate_links_demands(problem: &Rofa, routing_plan: &RoutingPlan) -> Vec<usize> {
+    fn calculate_links_demands(problem: &Rofa, routing_plan: &RoutingPlan) -> Vec<f64> {
         let demands = &problem.demands;
         let network = &problem.network;
         let routes = &routing_plan.routes;
 
-        let mut links_demands = vec![0; network.links.len()];
+        let mut links_demands = vec![0.0; network.links.len()];
         for (demand, route) in demands.iter().zip(routes) {
             for i in 0..(route.len() - 1) {
                 let link_ids = (

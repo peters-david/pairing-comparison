@@ -53,7 +53,7 @@ fn main() {
 
     // rofa settings ranges
     // TODO: costs can also be parameterized
-    let nodes = (100..=100).step_by(50);
+    let nodes = (20..=20).step_by(50);
     let links_percentage = (30..=30).step_by(40); // the minimum links required are nodes - 1
     let demands_percentage = (50..=50).step_by(40);
     let link_types = (8..=8).step_by(4);
@@ -85,18 +85,15 @@ fn main() {
     }
 
     // genetic algorithm settings
-    let population_size = vec![100]; // pair with generations
-    let survival_rate: Vec<f64> = (5..=5).step_by(4).map(|n| n as f64 * 0.1).collect();
-    // TODO: this doesnt neccessarily make sense, depend on difficulty instead
-    let generations = vec![10000];
-    let mutation_rate = vec![0.001, 0.01, 0.1];
+    let population_size_and_generations = vec![(10, 10000), (100, 1000)];
+    let survival_rate: Vec<f64> = (3..=7).step_by(2).map(|n| n as f64 * 0.1).collect();
+    let mutation_rate = vec![0.01, 0.1];
     let mutation_strength = vec![1];
 
     let mut genetic_algorithm_settings = Vec::new();
-    for (p, s, g, m_r, m_s) in iproduct!(
-        population_size,
+    for ((p, g), s, m_r, m_s) in iproduct!(
+        population_size_and_generations,
         survival_rate,
-        generations,
         mutation_rate,
         mutation_strength
     ) {
@@ -114,7 +111,55 @@ fn main() {
             desired_individual_distance_percentage: 1,
         },
         PairingSettings::SpatialDistancePairing {
+            desired_individual_distance_percentage: 2,
+        },
+        PairingSettings::SpatialDistancePairing {
+            desired_individual_distance_percentage: 3,
+        },
+        PairingSettings::SpatialDistancePairing {
+            desired_individual_distance_percentage: 4,
+        },
+        PairingSettings::SpatialDistancePairing {
+            desired_individual_distance_percentage: 5,
+        },
+        PairingSettings::SpatialDistancePairing {
+            desired_individual_distance_percentage: 6,
+        },
+        PairingSettings::SpatialDistancePairing {
+            desired_individual_distance_percentage: 7,
+        },
+        PairingSettings::SpatialDistancePairing {
+            desired_individual_distance_percentage: 8,
+        },
+        PairingSettings::SpatialDistancePairing {
+            desired_individual_distance_percentage: 9,
+        },
+        PairingSettings::SpatialDistancePairing {
             desired_individual_distance_percentage: 10,
+        },
+        PairingSettings::SpatialDistancePairing {
+            desired_individual_distance_percentage: 12,
+        },
+        PairingSettings::SpatialDistancePairing {
+            desired_individual_distance_percentage: 15,
+        },
+        PairingSettings::SpatialDistancePairing {
+            desired_individual_distance_percentage: 20,
+        },
+        PairingSettings::SpatialDistancePairing {
+            desired_individual_distance_percentage: 30,
+        },
+        PairingSettings::SpatialDistancePairing {
+            desired_individual_distance_percentage: 40,
+        },
+        PairingSettings::SpatialDistancePairing {
+            desired_individual_distance_percentage: 50,
+        },
+        PairingSettings::SpatialDistancePairing {
+            desired_individual_distance_percentage: 70,
+        },
+        PairingSettings::SpatialDistancePairing {
+            desired_individual_distance_percentage: 90,
         },
         PairingSettings::SpatialDistancePairing {
             desired_individual_distance_percentage: 100,
@@ -127,7 +172,7 @@ fn main() {
     let style = ProgressStyle::with_template("{msg:<12} [{bar:100.cyan/blue}] {pos}/{len}")
         .expect("Could not create progress bar style");
 
-    let iterations: usize = 3;
+    let iterations: usize = 10;
     let total_executions =
         genetic_algorithm_settings.len() * pairing_settings.len() * problems.len();
     let overall_progress_bar = m.add(ProgressBar::new(total_executions as u64));
