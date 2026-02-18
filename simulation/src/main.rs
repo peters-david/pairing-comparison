@@ -3,14 +3,12 @@ mod point;
 mod problems;
 mod synchronization;
 
-use std::sync::Arc;
-use std::time::Duration;
+use std::{fs::read_dir, sync::Arc};
 
 use chrono::Local;
 use clap::Parser;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use itertools::iproduct;
-use rand::Rng;
+use itertools::{iproduct, Itertools};
 use threadpool::ThreadPool;
 
 use crate::{
@@ -29,19 +27,29 @@ use shared::{
     statistics::{EvaluatedStatistics, Statistic, Statistics},
 };
 
-fn number_cpus() -> usize {
-    let percentage = std::fs::read_to_string("cpu_usage")
-        .unwrap_or("100".to_string())
-        .trim()
-        .parse()
-        .unwrap_or(100);
-    (num_cpus::get() as f64 * percentage as f64 * 0.01).ceil() as usize
+#[derive(Parser)]
+struct Args {
+    #[arg(long)]
+    resume: bool,
 }
 
 fn main() {
     print!("\x1B[2J\x1B[1;1H"); // clear
     let mut pool = ThreadPool::new(number_cpus());
-    let run_id = Local::now().format("%Y%m%d%H%M%S").to_string();
+
+    let args = Args::parse();
+    let (run_id, existing_unique_numbers) = match args.resume {
+        true => {
+            let run_id = last_run();
+            let existing_unique_numbers = existing_unique_numbers(&run_id);
+            (run_id, existing_unique_numbers)
+        }
+        false => {
+            let run_id = Local::now().format("%Y%m%d%H%M%S").to_string();
+            let existing_unique_numbers = vec![];
+            (run_id, existing_unique_numbers)
+        }
+    };
 
     // tsp settings ranges
     let size = (30..=50).step_by(20);
@@ -53,10 +61,10 @@ fn main() {
 
     // rofa settings ranges
     // TODO: costs can also be parameterized
-    let nodes = (20..=20).step_by(50);
-    let links_percentage = (30..=30).step_by(40); // the minimum links required are nodes - 1
-    let demands_percentage = (50..=50).step_by(40);
-    let link_types = (8..=8).step_by(4);
+    let nodes = (300..=300).step_by(50);
+    let links_percentage = (20..=40).step_by(30); // the minimum links required are nodes - 1
+    let demands_percentage = (20..=40).step_by(30);
+    let link_types = (4..=12).step_by(4);
 
     // here problemsettings are pushed together
     //let mut problem_settings = Vec::new();
@@ -85,9 +93,9 @@ fn main() {
     }
 
     // genetic algorithm settings
-    let population_size_and_generations = vec![(10, 10000), (100, 1000)];
-    let survival_rate: Vec<f64> = (3..=7).step_by(2).map(|n| n as f64 * 0.1).collect();
-    let mutation_rate = vec![0.01, 0.1];
+    let population_size_and_generations = vec![(100, 3000)];
+    let survival_rate: Vec<f64> = (1..=7).step_by(3).map(|n| n as f64 * 0.1).collect();
+    let mutation_rate = vec![0.1, 0.2, 0.3];
     let mutation_strength = vec![1];
 
     let mut genetic_algorithm_settings = Vec::new();
@@ -117,49 +125,16 @@ fn main() {
             desired_individual_distance_percentage: 3,
         },
         PairingSettings::SpatialDistancePairing {
-            desired_individual_distance_percentage: 4,
-        },
-        PairingSettings::SpatialDistancePairing {
             desired_individual_distance_percentage: 5,
-        },
-        PairingSettings::SpatialDistancePairing {
-            desired_individual_distance_percentage: 6,
-        },
-        PairingSettings::SpatialDistancePairing {
-            desired_individual_distance_percentage: 7,
-        },
-        PairingSettings::SpatialDistancePairing {
-            desired_individual_distance_percentage: 8,
-        },
-        PairingSettings::SpatialDistancePairing {
-            desired_individual_distance_percentage: 9,
         },
         PairingSettings::SpatialDistancePairing {
             desired_individual_distance_percentage: 10,
         },
         PairingSettings::SpatialDistancePairing {
-            desired_individual_distance_percentage: 12,
-        },
-        PairingSettings::SpatialDistancePairing {
-            desired_individual_distance_percentage: 15,
-        },
-        PairingSettings::SpatialDistancePairing {
             desired_individual_distance_percentage: 20,
         },
         PairingSettings::SpatialDistancePairing {
-            desired_individual_distance_percentage: 30,
-        },
-        PairingSettings::SpatialDistancePairing {
-            desired_individual_distance_percentage: 40,
-        },
-        PairingSettings::SpatialDistancePairing {
             desired_individual_distance_percentage: 50,
-        },
-        PairingSettings::SpatialDistancePairing {
-            desired_individual_distance_percentage: 70,
-        },
-        PairingSettings::SpatialDistancePairing {
-            desired_individual_distance_percentage: 90,
         },
         PairingSettings::SpatialDistancePairing {
             desired_individual_distance_percentage: 100,
@@ -169,17 +144,18 @@ fn main() {
     let m = Arc::new(MultiProgress::with_draw_target(
         indicatif::ProgressDrawTarget::stderr_with_hz(8),
     ));
-    let style = ProgressStyle::with_template("{msg:<12} [{bar:100.cyan/blue}] {pos}/{len}")
+    let style = ProgressStyle::with_template("{msg:<12} [{bar:100.cyan/blue}] {pos}/{len} ({eta})")
         .expect("Could not create progress bar style");
 
-    let iterations: usize = 10;
+    let iterations: usize = 1;
     let total_executions =
-        genetic_algorithm_settings.len() * pairing_settings.len() * problems.len();
+        genetic_algorithm_settings.len() * pairing_settings.len() * problems.len()
+            - existing_unique_numbers.len();
     let overall_progress_bar = m.add(ProgressBar::new(total_executions as u64));
     overall_progress_bar.set_style(style.clone());
     overall_progress_bar.set_message("Overall");
 
-    let max_queued_tasks = number_cpus() + 1;
+    let max_queued_tasks = number_cpus() + 2;
     let semaphore = Arc::new(Semaphore::new(max_queued_tasks));
 
     for (unique_number, (g_a_s, p_s, p)) in
@@ -188,38 +164,50 @@ fn main() {
         semaphore.acquire();
         let semaphore = Arc::clone(&semaphore);
         let run_id = run_id.clone();
+        let ran_previously = existing_unique_numbers.contains(&unique_number);
         let overall_progress_bar_handle = overall_progress_bar.clone();
         let m = m.clone();
         pool.set_num_threads(number_cpus());
-        pool.execute(move || {
-            let progress_bar = m.add(ProgressBar::new(iterations as u64));
-            progress_bar.set_style(
-                ProgressStyle::with_template("{msg:<12} [{bar:100.cyan/blue}] {pos}/{len}")
-                    .expect("Could not create progress bar style"),
-            );
-            progress_bar.set_message(format!("{unique_number}"));
-
-            let mut statistics = Vec::new();
-            for _i in 0..iterations {
-                let p = p.clone();
-                let p_s = p_s.clone();
-                let g_a_s = g_a_s.clone();
-                let statistic = match p {
-                    Problems::Tsp(p) => create_pairing_run_genetic_algorithm(p, p_s, g_a_s),
-                    Problems::Rofa(p) => create_pairing_run_genetic_algorithm(p, p_s, g_a_s),
-                };
-                statistics.push(statistic);
-                progress_bar.inc(1);
-            }
-            progress_bar.finish_and_clear();
-
-            let statistics = Statistics::from(statistics);
-            let evaluated_statistics = EvaluatedStatistics::from(statistics);
-            evaluated_statistics.save(run_id, unique_number.to_string());
-
-            overall_progress_bar_handle.inc(1);
+        if ran_previously {
             semaphore.release();
-        });
+        } else {
+            pool.execute(move || {
+                let progress_bar = m.add(ProgressBar::new(iterations as u64));
+                progress_bar.set_style(
+                    ProgressStyle::with_template(
+                        "{msg:<12} [{bar:100.cyan/blue}] {pos}/{len} ({eta})",
+                    )
+                    .expect("Could not create progress bar style"),
+                );
+                progress_bar.set_message(format!("{unique_number}"));
+
+                let mut statistics = Vec::new();
+                for _i in 0..iterations {
+                    let p = p.clone();
+                    let p_s = p_s.clone();
+                    let g_a_s = g_a_s.clone();
+                    let p_b = progress_bar.clone();
+                    let statistic = match p {
+                        Problems::Tsp(p) => {
+                            create_pairing_run_genetic_algorithm(p, p_s, g_a_s, unique_number, p_b)
+                        }
+                        Problems::Rofa(p) => {
+                            create_pairing_run_genetic_algorithm(p, p_s, g_a_s, unique_number, p_b)
+                        }
+                    };
+                    statistics.push(statistic);
+                    progress_bar.inc(1);
+                }
+                progress_bar.finish_and_clear();
+
+                let statistics = Statistics::from(statistics);
+                let evaluated_statistics = EvaluatedStatistics::from(statistics);
+                evaluated_statistics.save(run_id, unique_number.to_string());
+
+                overall_progress_bar_handle.inc(1);
+                semaphore.release();
+            });
+        }
     }
     pool.join();
     overall_progress_bar.finish();
@@ -229,10 +217,12 @@ fn create_pairing_run_genetic_algorithm(
     problem: impl Problem,
     pairing_settings: PairingSettings,
     genetic_algorithm_settings: GeneticAlgorithmSettings,
+    unique_number: usize,
+    progress_bar: ProgressBar,
 ) -> Statistic {
     let pairing = pairing_from_pairing_settings(pairing_settings);
     let mut ga = GeneticAlgorithm::new(problem, pairing, genetic_algorithm_settings);
-    ga.run();
+    ga.run(unique_number, progress_bar);
     ga.get_statistic()
 }
 
@@ -262,4 +252,56 @@ fn pairing_from_pairing_settings<I: Individual>(pairing_settings: PairingSetting
             desired_individual_distance_percentage,
         } => Pairings::SpatialDistancePairing(SpatialDistancePairing::new(p)),
     }
+}
+
+fn number_cpus() -> usize {
+    let percentage = std::fs::read_to_string("cpu_usage")
+        .unwrap_or("100".to_string())
+        .trim()
+        .parse()
+        .unwrap_or(100);
+    (num_cpus::get() as f64 * percentage as f64 * 0.01).ceil() as usize
+}
+
+fn last_run() -> String {
+    read_dir(".")
+        .expect("Could not get run id directory")
+        .map(|e| {
+            e.expect("Could not get directory in run id directory")
+                .path()
+        })
+        .filter(|p| p.is_dir())
+        .filter_map(|p| {
+            p.file_name()
+                .and_then(|n| n.to_str())
+                .filter(|n| n.starts_with(".20"))
+                .map(|_| p.clone())
+        })
+        .max_by(|a, b| {
+            a.file_name()
+                .expect("Error getting filename")
+                .cmp(b.file_name().expect("Error getting filename"))
+        })
+        .expect("Coud not get highest directory in run id directory")
+        .file_name()
+        .expect("Could not get name of highest run id directory")
+        .to_str()
+        .expect("Could not turn run id directory name into string")[1..]
+        .to_string()
+}
+
+fn existing_unique_numbers(run_id: &String) -> Vec<usize> {
+    read_dir(format!(".{}", run_id))
+        .expect("Could not get run id directory")
+        .map(|e| {
+            e.expect("Could not get file in run id directory")
+                .file_name()
+                .to_str()
+                .expect("Could not turn filename into string")
+                .strip_suffix(".json")
+                .expect("Could not strip suffix")
+                .parse::<usize>()
+                .expect("Could not parse number from filename")
+        })
+        .collect()
 }

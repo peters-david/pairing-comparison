@@ -174,6 +174,7 @@ impl Network {
         //TODO: this is a bad idea, edge cases can take a long time
         while !Self::coherent(&nodes, &links) {
             links = BidirectionalLink::random_links(&nodes, number_links);
+            todo!()
         }
         let link_map_start_id = Self::create_link_map(&links);
         let index_map_start_and_end_id = Self::create_index_map(&links);
@@ -183,6 +184,10 @@ impl Network {
             link_map_start_id,
             index_map_start_and_end_id,
         }
+    }
+
+    fn size(&self) -> usize {
+        self.nodes.len()
     }
 
     fn from(nodes: Vec<Node>, links: Vec<BidirectionalLink>) -> Self {
@@ -279,7 +284,7 @@ struct CapacityType {
 
 impl CapacityType {
     fn from_percentage(percentage: f64, number_demands: usize, number_links: usize) -> Self {
-        let max_capacity = number_demands as f64; // maximum demand of 1.0
+        let max_capacity = 2.0 * number_demands as f64; // maximum demand of 1.0
         let capacity = percentage * max_capacity;
         let max_fixed_cost = 1.0 / number_links as f64;
         let fixed_cost = percentage * max_fixed_cost; // in range [0,1]
@@ -322,6 +327,27 @@ impl CapacityTypes {
             }
         }
         max.clone()
+    }
+
+    fn optimal_for_demand(&self, demand: f64) -> CapacityType {
+        let mut best = None::<&CapacityType>;
+        for capacity_type in &self.capacity_types {
+            if capacity_type.capacity >= demand
+                && (best.is_none()
+                    || best.is_some()
+                        && capacity_type.capacity
+                            < best.expect("Best suited capacity should be some").capacity)
+            {
+                best = Some(capacity_type);
+            }
+        }
+        match best {
+            Some(c_t) => c_t.clone(),
+            None => {
+                println!("{}", demand);
+                panic!("No suitable capacity type for demand")
+            }
+        }
     }
 }
 
@@ -383,7 +409,7 @@ impl Rofa {
         {
             let cap = planned_capacity_type.capacity;
             assert!(
-                planned_capacity_type.capacity > total_demand,
+                planned_capacity_type.capacity >= total_demand,
                 "{cap} vs {total_demand} Demand cannot be bigger than capacity"
             );
 
@@ -460,8 +486,9 @@ impl RoutingPlan {
     /// # Returns
     /// A `Route` from start to end, with all intermediate nodes.
     fn any_route(network: &Network, from: Id, to: Id) -> Route {
+        assert!(from != to, "Should not need route from node to itself");
         let mut queue = VecDeque::new();
-        let mut visited = HashSet::new();
+        let mut visited = HashSet::with_capacity(network.size());
         let mut path_sections = HashMap::new();
         queue.push_back(from);
         visited.insert(from);
@@ -472,10 +499,10 @@ impl RoutingPlan {
             }
             let neighbors = network.neighbors(current);
             for neighbor in neighbors {
-                if !visited.contains(&neighbor) {
+                let newly_inserted = visited.insert(neighbor);
+                if newly_inserted {
                     path_sections.insert(neighbor, current);
                     queue.push_back(neighbor);
-                    visited.insert(neighbor);
                 }
             }
         }
@@ -574,6 +601,31 @@ impl CapacityPlan {
         }
     }
 
+    fn with_optimal_capacities(capacity_types: &CapacityTypes, links_demands: &Vec<f64>) -> Self {
+        let planned_capacity_types = links_demands
+            .iter()
+            .map(|&d| capacity_types.optimal_for_demand(d))
+            .collect();
+        Self {
+            planned_capacity_types,
+        }
+    }
+
+    fn ensure_capacity_sufficient(&mut self, links_demands: &Vec<f64>, problem: &Rofa) {
+        self.planned_capacity_types
+            .iter_mut()
+            .zip(links_demands)
+            .for_each(|(p_c_t, &l_d)| {
+                if l_d > p_c_t.capacity {
+                    *p_c_t = problem.capacity_types.optimal_for_demand(l_d);
+                    assert!(
+                        p_c_t.capacity >= l_d,
+                        "capacity smaller than demand at ensure_capacity"
+                    );
+                }
+            });
+    }
+
     fn crossover(first: &Self, second: &Self) -> Self {
         assert!(
             first.planned_capacity_types.len() == second.planned_capacity_types.len(),
@@ -650,12 +702,9 @@ pub struct RoutingAndCapacityPlan {
 impl RoutingAndCapacityPlan {
     fn random(problem: &Rofa) -> Self {
         let routing_plan = RoutingPlan::random_from_demands(&problem.network, &problem.demands);
-        // TODO: maybe store problem settings in rofa
-        let capacity_plan = CapacityPlan::with_highest_capacities(
-            &problem.capacity_types,
-            problem.network.links.len(),
-        );
         let links_demands = Self::calculate_links_demands(problem, &routing_plan);
+        let capacity_plan =
+            CapacityPlan::with_optimal_capacities(&problem.capacity_types, &links_demands);
         let id = get_id();
         let parent_ids = None;
         Self {
@@ -699,8 +748,10 @@ impl Individual for RoutingAndCapacityPlan {
 
     fn crossover(first: &Self, second: &Self, problem: &Self::Problem) -> Self {
         let routing_plan = RoutingPlan::crossover(&first.routing_plan, &second.routing_plan);
-        let capacity_plan = CapacityPlan::crossover(&first.capacity_plan, &second.capacity_plan);
         let links_demands = RoutingAndCapacityPlan::calculate_links_demands(problem, &routing_plan);
+        let mut capacity_plan =
+            CapacityPlan::crossover(&first.capacity_plan, &second.capacity_plan);
+        capacity_plan.ensure_capacity_sufficient(&links_demands, problem);
         let id = get_id();
         let parent_ids = Some((first.id(), second.id()));
         Self {
@@ -715,6 +766,8 @@ impl Individual for RoutingAndCapacityPlan {
     fn mutate(&mut self, problem: &Self::Problem) {
         self.routing_plan.mutate(problem);
         self.capacity_plan.mutate(self.get_links_demands(), problem);
+        self.capacity_plan
+            .ensure_capacity_sufficient(&self.links_demands, problem);
     }
 
     fn id(&self) -> Id {

@@ -5,6 +5,7 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 
+use indicatif::ProgressBar;
 use rand::{prelude::*, rng, seq::IndexedRandom};
 use rand_distr::{Distribution, Normal};
 use shared::{
@@ -54,11 +55,12 @@ impl<P: Problem<Individual = I>, X: Pairing<I>, I: Individual<Problem = P>>
         }
     }
 
-    pub fn run(&mut self) {
+    pub fn run(&mut self, unique_number: usize, progress_bar: ProgressBar) {
         let mut individuals = (0..self.genetic_algorithm_settings.population_size())
             .map(|_| self.problem.random_individual())
             .collect();
         for generation in 0..self.genetic_algorithm_settings.generations() {
+            progress_bar.set_message(format!("{}:{}", unique_number, generation));
             individuals = self.step(individuals);
         }
     }
