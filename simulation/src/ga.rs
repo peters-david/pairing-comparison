@@ -1,6 +1,6 @@
 use std::{
     any::Any,
-    collections::HashMap,
+    collections::BTreeMap,
     marker::PhantomData,
     sync::atomic::{AtomicU64, Ordering},
 };
@@ -533,12 +533,12 @@ impl<const N: usize> Position<N> {
 
 #[derive(Clone, Debug)]
 struct Space<const N: usize> {
-    positions: HashMap<Id, Position<N>>,
+    positions: BTreeMap<Id, Position<N>>,
 }
 
 impl<const N: usize> Space<N> {
     fn new_at_origin(ids: Vec<Id>) -> Self {
-        let mut positions = HashMap::new();
+        let mut positions = BTreeMap::new();
         for id in ids {
             positions.insert(id, Position::origin());
         }
@@ -550,7 +550,7 @@ impl<const N: usize> Space<N> {
         rng: &mut StdRng,
         id_relationships: Vec<(Id, (Id, Id))>,
     ) -> Self {
-        let mut new_positions = HashMap::new();
+        let mut new_positions = BTreeMap::new();
         for (child_id, (first_parent_id, second_parent_id)) in id_relationships {
             let first_position = self
                 .positions

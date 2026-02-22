@@ -2,7 +2,7 @@
 /// **IMPORTANT:** This assumes nodes have continuous, gapless ids starting from 0.
 use std::{
     any::Any,
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{BTreeMap, BTreeSet, VecDeque},
 };
 
 use rand::{
@@ -158,8 +158,8 @@ impl BidirectionalDemand {
 pub struct Network {
     nodes: Vec<Node>,
     links: Vec<BidirectionalLink>,
-    link_map_start_id: HashMap<Id, Vec<BidirectionalLink>>,
-    index_map_start_and_end_id: HashMap<(Id, Id), usize>,
+    link_map_start_id: BTreeMap<Id, Vec<BidirectionalLink>>,
+    index_map_start_and_end_id: BTreeMap<(Id, Id), usize>,
 }
 
 impl Network {
@@ -211,8 +211,8 @@ impl Network {
             .expect("No fitting index in index map")
     }
 
-    fn create_index_map(links: &Vec<BidirectionalLink>) -> HashMap<(Id, Id), usize> {
-        let mut index_map_start_and_end_id = HashMap::new();
+    fn create_index_map(links: &Vec<BidirectionalLink>) -> BTreeMap<(Id, Id), usize> {
+        let mut index_map_start_and_end_id = BTreeMap::new();
         for (i, link) in links.iter().enumerate() {
             for from in link.froms() {
                 let to = link.to(from);
@@ -230,8 +230,8 @@ impl Network {
             .clone()
     }
 
-    fn create_link_map(links: &Vec<BidirectionalLink>) -> HashMap<Id, Vec<BidirectionalLink>> {
-        let mut link_map = HashMap::new();
+    fn create_link_map(links: &Vec<BidirectionalLink>) -> BTreeMap<Id, Vec<BidirectionalLink>> {
+        let mut link_map = BTreeMap::new();
         for link in links {
             let froms = link.froms();
             for from in froms {
@@ -493,8 +493,8 @@ impl RoutingPlan {
     fn any_route(network: &Network, from: Id, to: Id) -> Route {
         assert!(from != to, "Should not need route from node to itself");
         let mut queue = VecDeque::new();
-        let mut visited = HashSet::with_capacity(network.size());
-        let mut path_sections = HashMap::new();
+        let mut visited = BTreeSet::new();
+        let mut path_sections = BTreeMap::new();
         queue.push_back(from);
         visited.insert(from);
 

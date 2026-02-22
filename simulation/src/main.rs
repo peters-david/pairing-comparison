@@ -61,7 +61,7 @@ fn main() {
 
     // rofa settings ranges
     // TODO: costs can also be parameterized
-    let nodes = (20..=20).step_by(50);
+    let nodes = (40..=40).step_by(50);
     let links_percentage = (20..=40).step_by(30); // the minimum links required are nodes - 1
     let demands_percentage = (50..=50).step_by(30);
     let link_types = (8..=12).step_by(8);
@@ -95,9 +95,9 @@ fn main() {
     }
 
     // genetic algorithm settings
-    let population_size_and_generations = vec![(100, 2000)];
-    let survival_rate: Vec<f64> = (5..=9).step_by(4).map(|n| n as f64 * 0.1).collect();
-    let mutation_rate = vec![0.05, 0.3];
+    let population_size_and_generations = vec![(10, 200)];
+    let survival_rate: Vec<f64> = (5..=5).step_by(4).map(|n| n as f64 * 0.1).collect();
+    let mutation_rate = vec![0.01, 0.05, 0.3];
     let mutation_strength = vec![1];
 
     let mut genetic_algorithm_settings = Vec::new();
@@ -111,14 +111,14 @@ fn main() {
     }
 
     let mut individual_quantities = vec![
-        IndividualQuantity::Random,
-        IndividualQuantity::FitnessProportionate,
+        // IndividualQuantity::Random,
+        // IndividualQuantity::FitnessProportionate,
     ];
 
-    for p in [5, 10, 50, 90] {
+    for p in [20] {
         individual_quantities.extend(vec![
             IndividualQuantity::Elite { percentage: p },
-            IndividualQuantity::AntiElite { percentage: p },
+            // IndividualQuantity::AntiElite { percentage: p },
         ]);
     }
 
@@ -128,17 +128,17 @@ fn main() {
         //     PairingSettings::AsexualPairing { quantity: i_q },
         //     PairingSettings::RandomPairing { quantity: i_q },
         // ]);
-        for s in [3, 5, 10, 20, 30, 40, 50] {
-            pairing_settings.push(PairingSettings::SimilarFitnessPairing {
-                quantity: i_q,
-                similarity: s,
-            });
-        }
+        // for s in [3, 5, 10, 20, 30, 40, 50] {
+        //     pairing_settings.push(PairingSettings::SimilarFitnessPairing {
+        //         quantity: i_q,
+        //         similarity: s,
+        //     });
+        // }
         for d_i_d_p in [1, 2, 3, 5, 10, 20, 50, 100] {
-            // pairing_settings.push(PairingSettings::SpatialDistancePairing {
-            //     quantity: i_q,
-            //     desired_individual_distance_percentage: d_i_d_p,
-            // });
+            pairing_settings.push(PairingSettings::SpatialDistancePairing {
+                quantity: i_q,
+                desired_individual_distance_percentage: d_i_d_p,
+            });
         }
     }
 
@@ -148,7 +148,7 @@ fn main() {
     let style = ProgressStyle::with_template("{msg:<12} [{bar:100.cyan/blue}] {pos}/{len} ({eta})")
         .expect("Could not create progress bar style");
 
-    let iterations: usize = 100;
+    let iterations: usize = 1;
     let total_executions =
         genetic_algorithm_settings.len() * pairing_settings.len() * problems.len()
             - existing_unique_numbers.len();
