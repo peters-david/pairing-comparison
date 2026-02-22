@@ -94,17 +94,39 @@ impl ProblemSettings {
     }
 }
 
+#[derive(Copy, Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum IndividualQuantity {
+    Random,
+    Elite { percentage: usize },
+    AntiElite { percentage: usize },
+    FitnessProportionate,
+}
+
+impl IndividualQuantity {
+    pub fn description(&self) -> String {
+        match self {
+            IndividualQuantity::Random => format!("Random"),
+            IndividualQuantity::Elite { percentage } => format!("Elite({}%)", percentage),
+            IndividualQuantity::AntiElite { percentage } => format!("AntiElite({}%)", percentage),
+            IndividualQuantity::FitnessProportionate => format!("FitnessProportionate"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum PairingSettings {
-    AsexualPairing,
-    TwoRandomPairing,
-    OneRandomPairing,
-    NeighborPairing,
-    SimilarFitnessPairing,
-    FitnessProportionatePairing,
-    ElitePairing,
-    AntiElitePairing,
+    AsexualPairing {
+        quantity: IndividualQuantity,
+    },
+    RandomPairing {
+        quantity: IndividualQuantity,
+    },
+    SimilarFitnessPairing {
+        quantity: IndividualQuantity,
+        similarity: usize,
+    },
     SpatialDistancePairing {
+        quantity: IndividualQuantity,
         desired_individual_distance_percentage: usize,
     },
 }
@@ -112,22 +134,45 @@ pub enum PairingSettings {
 impl PairingSettings {
     pub fn description(&self) -> String {
         match self {
-            PairingSettings::AsexualPairing => format!("Pairing: Asexual"),
-            PairingSettings::TwoRandomPairing => format!("Pairing: TwoRandom"),
-            PairingSettings::OneRandomPairing => format!("Pairing: OneRandom"),
-            PairingSettings::NeighborPairing => format!("Pairing: Neighbor"),
-            PairingSettings::SimilarFitnessPairing => format!("Pairing: SimilarFitness"),
-            PairingSettings::FitnessProportionatePairing => {
-                format!("Pairing: FitnessProportionate")
+            PairingSettings::AsexualPairing { quantity } => {
+                format!("Pairing: Asexual<{}>", quantity.description())
             }
-            PairingSettings::ElitePairing => format!("Pairing: Elite"),
-            PairingSettings::AntiElitePairing => format!("Pairing: AntiElite"),
+            PairingSettings::RandomPairing { quantity } => {
+                format!("Pairing: Random<{}>", quantity.description())
+            }
+            PairingSettings::SimilarFitnessPairing {
+                quantity,
+                similarity,
+            } => {
+                format!(
+                    "Pairing: SimilarFitness<{}>(similarity:{})",
+                    quantity.description(),
+                    similarity
+                )
+            }
             PairingSettings::SpatialDistancePairing {
+                quantity,
                 desired_individual_distance_percentage,
             } => format!(
-                "Pairing: SpatialDistance({})",
+                "Pairing: SpatialDistance<{}>({})",
+                quantity.description(),
                 desired_individual_distance_percentage
             ),
+        }
+    }
+
+    pub fn quantity(&self) -> &IndividualQuantity {
+        match self {
+            PairingSettings::AsexualPairing { quantity } => quantity,
+            PairingSettings::RandomPairing { quantity } => quantity,
+            PairingSettings::SimilarFitnessPairing {
+                quantity,
+                similarity,
+            } => quantity,
+            PairingSettings::SpatialDistancePairing {
+                quantity,
+                desired_individual_distance_percentage,
+            } => quantity,
         }
     }
 }

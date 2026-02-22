@@ -1,9 +1,14 @@
 /// Route optimization flow assignment problem
 /// **IMPORTANT:** This assumes nodes have continuous, gapless ids starting from 0.
-use rand::prelude::*;
 use std::{
     any::Any,
     collections::{HashMap, HashSet, VecDeque},
+};
+
+use rand::{
+    rngs::StdRng,
+    seq::{IndexedRandom, IteratorRandom},
+    RngExt,
 };
 
 use shared::settings::ProblemSettings;
@@ -62,9 +67,8 @@ impl BidirectionalLink {
         }
     }
 
-    fn random_links(nodes: &Vec<Node>, number_links: usize) -> Vec<Self> {
+    fn random_links(rng: &mut StdRng, nodes: &Vec<Node>, number_links: usize) -> Vec<Self> {
         let number_nodes = nodes.len();
-        let mut rng = rand::rng();
         let mut links = Vec::with_capacity(number_links);
         for _ in 0..number_links {
             let mut between = (
@@ -118,8 +122,7 @@ impl BidirectionalDemand {
             || (nodes.0 == self.demand_nodes.1 && nodes.1 == self.demand_nodes.0)
     }
 
-    fn random_demands(number_nodes: usize, number_demands: usize) -> Vec<Self> {
-        let mut rng = rand::rng();
+    fn random_demands(rng: &mut StdRng, number_nodes: usize, number_demands: usize) -> Vec<Self> {
         let mut demands = Vec::with_capacity(number_demands);
         for _ in 0..number_demands {
             let mut between = (
@@ -160,7 +163,7 @@ pub struct Network {
 }
 
 impl Network {
-    fn random(number_nodes: usize, number_links: usize) -> Self {
+    fn random(rng: &mut StdRng, number_nodes: usize, number_links: usize) -> Self {
         assert!(
             number_links >= number_nodes - 1,
             "Not enough links to build a coherent network"
@@ -170,10 +173,10 @@ impl Network {
             "Cannot have unique links, there are too many"
         );
         let nodes = (0..number_nodes).map(Node::with_id).collect();
-        let mut links = BidirectionalLink::random_links(&nodes, number_links);
+        let mut links = BidirectionalLink::random_links(rng, &nodes, number_links);
         //TODO: this is a bad idea, edge cases can take a long time
         while !Self::coherent(&nodes, &links) {
-            links = BidirectionalLink::random_links(&nodes, number_links);
+            links = BidirectionalLink::random_links(rng, &nodes, number_links);
             todo!()
         }
         let link_map_start_id = Self::create_link_map(&links);
@@ -287,8 +290,8 @@ impl CapacityType {
         let max_capacity = 2.0 * number_demands as f64; // maximum demand of 1.0
         let capacity = percentage * max_capacity;
         let max_fixed_cost = 1.0 / number_links as f64;
-        let fixed_cost = percentage * max_fixed_cost; // in range [0,1]
-        let variable_cost = fixed_cost;
+        let fixed_cost = percentage.powf(1.0 / 3.0) * max_fixed_cost; // in range [0,1]
+        let variable_cost = percentage * max_fixed_cost;
         Self {
             capacity,
             fixed_cost,
@@ -360,7 +363,7 @@ pub struct Rofa {
 }
 
 impl Rofa {
-    pub fn random(problem_settings: &ProblemSettings) -> Self {
+    pub fn random(rng: &mut StdRng, problem_settings: &ProblemSettings) -> Self {
         let (number_nodes, links_percentage, demands_percentage, number_link_types) =
             match problem_settings {
                 ProblemSettings::Rofa {
@@ -383,8 +386,8 @@ impl Rofa {
         let number_demands = ((demands_max - demands_min) as f64 * demands_percentage as f64 * 0.01)
             .ceil() as usize
             + demands_min;
-        let network = Network::random(number_nodes, number_links);
-        let demands = BidirectionalDemand::random_demands(number_nodes, number_demands);
+        let network = Network::random(rng, number_nodes, number_links);
+        let demands = BidirectionalDemand::random_demands(rng, number_nodes, number_demands);
         let capacity_types = CapacityTypes::random(number_link_types, number_demands, number_links);
         Self {
             network,
@@ -423,7 +426,9 @@ impl Rofa {
         let number_links = all_links_demands.len();
         let delay_cost =
             (unweighted_delay_cost / (number_links as f64)).powf(DELAY_SCALING_EXPONENT);
+        fixed_cost /= 10.0;
 
+        //println!("{}/{}/{}", delay_cost, fixed_cost, variable_cost); // TODO
         delay_cost + fixed_cost + variable_cost
     }
 }
@@ -434,11 +439,11 @@ const CONGESTION_EXPONENT: i32 = 3;
 impl Problem for Rofa {
     type Individual = RoutingAndCapacityPlan;
 
-    fn random(problem_settings: &ProblemSettings) -> Self {
-        Self::random(problem_settings)
+    fn random(rng: &mut StdRng, problem_settings: &ProblemSettings) -> Self {
+        Self::random(rng, problem_settings)
     }
 
-    fn random_individual(&self) -> Self::Individual {
+    fn random_individual(&self, rng: &mut StdRng) -> Self::Individual {
         RoutingAndCapacityPlan::random(self)
     }
 
@@ -528,14 +533,13 @@ impl RoutingPlan {
         path
     }
 
-    fn crossover(first: &Self, second: &Self) -> Self {
+    fn crossover(rng: &mut StdRng, first: &Self, second: &Self) -> Self {
         let first_routes = &first.routes;
         let second_routes = &second.routes;
         assert!(
             first_routes.len() == second_routes.len(),
             "RoutingPlans must have the same number of routes"
         );
-        let mut rng = rand::rng();
         let half_routing_length = first_routes.len() / 2;
         let first_crossover_index = rng.random_range(0..half_routing_length);
         let second_crossover_index = first_crossover_index + half_routing_length;
@@ -552,11 +556,10 @@ impl RoutingPlan {
         Self { routes }
     }
 
-    fn mutate(&mut self, problem: &Rofa) {
+    fn mutate(&mut self, rng: &mut StdRng, problem: &Rofa) {
         let length = self.routes.len();
-        let mut rng = rand::rng();
         let index_to_mutate = (0..length)
-            .choose(&mut rng)
+            .choose(rng)
             .expect("Cannot choose index to mutate");
         let route_to_mutate = self
             .routes
@@ -576,7 +579,7 @@ impl RoutingPlan {
             .filter(|&id| id != first && id != second)
             .collect();
         let intermediate = *possible_intermediates
-            .choose(&mut rng)
+            .choose(rng)
             .expect("Cannot choose intermediate");
         let mut first_part = Self::any_route(&problem.network, first, intermediate);
         let second_part = Self::any_route(&problem.network, intermediate, second);
@@ -626,16 +629,15 @@ impl CapacityPlan {
             });
     }
 
-    fn crossover(first: &Self, second: &Self) -> Self {
+    fn crossover(rng: &mut StdRng, first: &Self, second: &Self) -> Self {
         assert!(
             first.planned_capacity_types.len() == second.planned_capacity_types.len(),
             "The length of capacity plans must match"
         );
         let length = first.planned_capacity_types.len();
         let length_other_parent = (length as f32 / 2.0).floor() as usize;
-        let mut rng = rand::rng();
         let crossover_point_one = (0..length_other_parent)
-            .choose(&mut rng)
+            .choose(rng)
             .expect("Could not choose first crossover point");
         let crossover_point_two = crossover_point_one + length_other_parent;
         let mut planned_capacity_types = Vec::new();
@@ -665,11 +667,10 @@ impl CapacityPlan {
         }
     }
 
-    fn mutate(&mut self, min_capacities: Vec<f64>, problem: &Rofa) {
+    fn mutate(&mut self, rng: &mut StdRng, min_capacities: Vec<f64>, problem: &Rofa) {
         let length = self.planned_capacity_types.len();
-        let mut rng = rand::rng();
         let index_to_mutate = (0..length)
-            .choose(&mut rng)
+            .choose(rng)
             .expect("Cannot get index for mutation");
         let capacity_to_mutate = self
             .planned_capacity_types
@@ -683,7 +684,7 @@ impl CapacityPlan {
             .capacity_types
             .iter()
             .filter(|c| c.capacity > min_capacity)
-            .choose(&mut rng)
+            .choose(rng)
             .expect("Cannot choose mutation capacity type")
             .clone();
         *capacity_to_mutate = mutated_capacity;
@@ -746,11 +747,11 @@ impl RoutingAndCapacityPlan {
 impl Individual for RoutingAndCapacityPlan {
     type Problem = Rofa;
 
-    fn crossover(first: &Self, second: &Self, problem: &Self::Problem) -> Self {
-        let routing_plan = RoutingPlan::crossover(&first.routing_plan, &second.routing_plan);
+    fn crossover(rng: &mut StdRng, first: &Self, second: &Self, problem: &Self::Problem) -> Self {
+        let routing_plan = RoutingPlan::crossover(rng, &first.routing_plan, &second.routing_plan);
         let links_demands = RoutingAndCapacityPlan::calculate_links_demands(problem, &routing_plan);
         let mut capacity_plan =
-            CapacityPlan::crossover(&first.capacity_plan, &second.capacity_plan);
+            CapacityPlan::crossover(rng, &first.capacity_plan, &second.capacity_plan);
         capacity_plan.ensure_capacity_sufficient(&links_demands, problem);
         let id = get_id();
         let parent_ids = Some((first.id(), second.id()));
@@ -763,9 +764,10 @@ impl Individual for RoutingAndCapacityPlan {
         }
     }
 
-    fn mutate(&mut self, problem: &Self::Problem) {
-        self.routing_plan.mutate(problem);
-        self.capacity_plan.mutate(self.get_links_demands(), problem);
+    fn mutate(&mut self, rng: &mut StdRng, problem: &Self::Problem) {
+        self.routing_plan.mutate(rng, problem);
+        self.capacity_plan
+            .mutate(rng, self.get_links_demands(), problem);
         self.capacity_plan
             .ensure_capacity_sufficient(&self.links_demands, problem);
     }

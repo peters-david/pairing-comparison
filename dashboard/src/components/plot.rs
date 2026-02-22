@@ -50,7 +50,7 @@ pub fn statistics_plot(props: &StatisticsPlotProps) -> Html {
         let data = data.clone();
         use_effect_with(props.all_statistics.clone(), move |statistics| {
             console_error(&format!("{:#?}", statistics));
-            let traces = statistics
+            let mut traces = statistics
                 .iter()
                 .map(|t| {
                     // let (name_lower, data_lower) = t.fields()[3].clone();
@@ -88,7 +88,13 @@ pub fn statistics_plot(props: &StatisticsPlotProps) -> Html {
                 .iter()
                 .flatten()
                 .cloned()
-                .collect();
+                .collect::<Vec<Trace>>();
+            traces.sort_by(|a, b| {
+                b.y.last()
+                    .expect("No y value in trace")
+                    .partial_cmp(a.y.last().expect("No y value in trace"))
+                    .expect("Could not order traces by end result")
+            });
             data.set(Some(traces));
             || ()
         });

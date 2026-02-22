@@ -9,21 +9,20 @@ use chrono::Local;
 use clap::Parser;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use itertools::{iproduct, Itertools};
+use rand::{rngs::StdRng, SeedableRng};
 use threadpool::ThreadPool;
 
 use crate::{
     ga::{
-        AntiElitePairing, AsexualPairing, ElitePairing, FitnessProportionatePairing,
-        GeneticAlgorithm, Individual, OneRandomPairing, Pairings, Problem, Problems,
-        SimilarFitnessPairing, SpatialDistancePairing, ThirdFourthNeighborPairing,
-        TwoRandomPairing,
+        AsexualPairing, GeneticAlgorithm, Individual, Pairings, Problem, Problems, RandomPairing,
+        SimilarFitnessPairing, SpatialDistancePairing,
     },
     synchronization::Semaphore,
 };
 use problems::rofa::Rofa;
 use problems::tsp::Cities;
 use shared::{
-    settings::{GeneticAlgorithmSettings, PairingSettings, ProblemSettings},
+    settings::{GeneticAlgorithmSettings, IndividualQuantity, PairingSettings, ProblemSettings},
     statistics::{EvaluatedStatistics, Statistic, Statistics},
 };
 
@@ -36,6 +35,7 @@ struct Args {
 fn main() {
     print!("\x1B[2J\x1B[1;1H"); // clear
     let mut pool = ThreadPool::new(number_cpus());
+    let mut first_level_rng = StdRng::seed_from_u64(0u64);
 
     let args = Args::parse();
     let (run_id, existing_unique_numbers) = match args.resume {
@@ -61,10 +61,10 @@ fn main() {
 
     // rofa settings ranges
     // TODO: costs can also be parameterized
-    let nodes = (300..=300).step_by(50);
+    let nodes = (20..=20).step_by(50);
     let links_percentage = (20..=40).step_by(30); // the minimum links required are nodes - 1
-    let demands_percentage = (20..=40).step_by(30);
-    let link_types = (4..=12).step_by(4);
+    let demands_percentage = (50..=50).step_by(30);
+    let link_types = (8..=12).step_by(8);
 
     // here problemsettings are pushed together
     //let mut problem_settings = Vec::new();
@@ -81,21 +81,23 @@ fn main() {
     for problem_setting in problem_settings {
         problems.push({
             match problem_setting {
-                p_s @ ProblemSettings::Tsp { size: _ } => Problems::Tsp(Cities::random(&p_s)),
+                p_s @ ProblemSettings::Tsp { size: _ } => {
+                    Problems::Tsp(Cities::random(&mut first_level_rng, &p_s))
+                }
                 p_s @ ProblemSettings::Rofa {
                     nodes: _,
                     links_percentage: _,
                     demands_percentage: _,
                     link_types: _,
-                } => Problems::Rofa(Rofa::random(&p_s)),
+                } => Problems::Rofa(Rofa::random(&mut first_level_rng, &p_s)),
             }
         });
     }
 
     // genetic algorithm settings
-    let population_size_and_generations = vec![(100, 3000)];
-    let survival_rate: Vec<f64> = (1..=7).step_by(3).map(|n| n as f64 * 0.1).collect();
-    let mutation_rate = vec![0.1, 0.2, 0.3];
+    let population_size_and_generations = vec![(100, 2000)];
+    let survival_rate: Vec<f64> = (5..=9).step_by(4).map(|n| n as f64 * 0.1).collect();
+    let mutation_rate = vec![0.05, 0.3];
     let mutation_strength = vec![1];
 
     let mut genetic_algorithm_settings = Vec::new();
@@ -108,38 +110,37 @@ fn main() {
         genetic_algorithm_settings.push(GeneticAlgorithmSettings::new(p, s, g, m_r, m_s));
     }
 
-    let pairing_settings = vec![
-        PairingSettings::AsexualPairing,
-        PairingSettings::TwoRandomPairing,
-        PairingSettings::OneRandomPairing,
-        PairingSettings::NeighborPairing,
-        PairingSettings::SimilarFitnessPairing,
-        PairingSettings::FitnessProportionatePairing,
-        PairingSettings::SpatialDistancePairing {
-            desired_individual_distance_percentage: 1,
-        },
-        PairingSettings::SpatialDistancePairing {
-            desired_individual_distance_percentage: 2,
-        },
-        PairingSettings::SpatialDistancePairing {
-            desired_individual_distance_percentage: 3,
-        },
-        PairingSettings::SpatialDistancePairing {
-            desired_individual_distance_percentage: 5,
-        },
-        PairingSettings::SpatialDistancePairing {
-            desired_individual_distance_percentage: 10,
-        },
-        PairingSettings::SpatialDistancePairing {
-            desired_individual_distance_percentage: 20,
-        },
-        PairingSettings::SpatialDistancePairing {
-            desired_individual_distance_percentage: 50,
-        },
-        PairingSettings::SpatialDistancePairing {
-            desired_individual_distance_percentage: 100,
-        },
+    let mut individual_quantities = vec![
+        IndividualQuantity::Random,
+        IndividualQuantity::FitnessProportionate,
     ];
+
+    for p in [5, 10, 50, 90] {
+        individual_quantities.extend(vec![
+            IndividualQuantity::Elite { percentage: p },
+            IndividualQuantity::AntiElite { percentage: p },
+        ]);
+    }
+
+    let mut pairing_settings = Vec::new();
+    for i_q in individual_quantities {
+        // pairing_settings.extend(vec![
+        //     PairingSettings::AsexualPairing { quantity: i_q },
+        //     PairingSettings::RandomPairing { quantity: i_q },
+        // ]);
+        for s in [3, 5, 10, 20, 30, 40, 50] {
+            pairing_settings.push(PairingSettings::SimilarFitnessPairing {
+                quantity: i_q,
+                similarity: s,
+            });
+        }
+        for d_i_d_p in [1, 2, 3, 5, 10, 20, 50, 100] {
+            // pairing_settings.push(PairingSettings::SpatialDistancePairing {
+            //     quantity: i_q,
+            //     desired_individual_distance_percentage: d_i_d_p,
+            // });
+        }
+    }
 
     let m = Arc::new(MultiProgress::with_draw_target(
         indicatif::ProgressDrawTarget::stderr_with_hz(8),
@@ -147,7 +148,7 @@ fn main() {
     let style = ProgressStyle::with_template("{msg:<12} [{bar:100.cyan/blue}] {pos}/{len} ({eta})")
         .expect("Could not create progress bar style");
 
-    let iterations: usize = 1;
+    let iterations: usize = 100;
     let total_executions =
         genetic_algorithm_settings.len() * pairing_settings.len() * problems.len()
             - existing_unique_numbers.len();
@@ -181,6 +182,7 @@ fn main() {
                 );
                 progress_bar.set_message(format!("{unique_number}"));
 
+                let mut rng = StdRng::seed_from_u64(unique_number as u64);
                 let mut statistics = Vec::new();
                 for _i in 0..iterations {
                     let p = p.clone();
@@ -188,12 +190,22 @@ fn main() {
                     let g_a_s = g_a_s.clone();
                     let p_b = progress_bar.clone();
                     let statistic = match p {
-                        Problems::Tsp(p) => {
-                            create_pairing_run_genetic_algorithm(p, p_s, g_a_s, unique_number, p_b)
-                        }
-                        Problems::Rofa(p) => {
-                            create_pairing_run_genetic_algorithm(p, p_s, g_a_s, unique_number, p_b)
-                        }
+                        Problems::Tsp(p) => create_pairing_run_genetic_algorithm(
+                            &mut rng,
+                            p,
+                            p_s,
+                            g_a_s,
+                            unique_number,
+                            p_b,
+                        ),
+                        Problems::Rofa(p) => create_pairing_run_genetic_algorithm(
+                            &mut rng,
+                            p,
+                            p_s,
+                            g_a_s,
+                            unique_number,
+                            p_b,
+                        ),
                     };
                     statistics.push(statistic);
                     progress_bar.inc(1);
@@ -214,6 +226,7 @@ fn main() {
 }
 
 fn create_pairing_run_genetic_algorithm(
+    rng: &mut StdRng,
     problem: impl Problem,
     pairing_settings: PairingSettings,
     genetic_algorithm_settings: GeneticAlgorithmSettings,
@@ -222,35 +235,22 @@ fn create_pairing_run_genetic_algorithm(
 ) -> Statistic {
     let pairing = pairing_from_pairing_settings(pairing_settings);
     let mut ga = GeneticAlgorithm::new(problem, pairing, genetic_algorithm_settings);
-    ga.run(unique_number, progress_bar);
+    ga.run(rng, unique_number, progress_bar);
     ga.get_statistic()
 }
 
 fn pairing_from_pairing_settings<I: Individual>(pairing_settings: PairingSettings) -> Pairings<I> {
     match pairing_settings {
-        p @ PairingSettings::AsexualPairing => Pairings::AsexualPairing(AsexualPairing::new(p)),
-        p @ PairingSettings::TwoRandomPairing => {
-            Pairings::TwoRandomPairing(TwoRandomPairing::new(p))
+        p @ PairingSettings::AsexualPairing { .. } => {
+            Pairings::AsexualPairing(AsexualPairing::new(p))
         }
-        p @ PairingSettings::OneRandomPairing => {
-            Pairings::OneRandomPairing(OneRandomPairing::new(p))
-        }
-        p @ PairingSettings::SimilarFitnessPairing => {
+        p @ PairingSettings::RandomPairing { .. } => Pairings::RandomPairing(RandomPairing::new(p)),
+        p @ PairingSettings::SimilarFitnessPairing { .. } => {
             Pairings::SimilarFitnessPairing(SimilarFitnessPairing::new(p))
         }
-        p @ PairingSettings::NeighborPairing => {
-            Pairings::ThirdFourthNeighborPairing(ThirdFourthNeighborPairing::new(p))
+        p @ PairingSettings::SpatialDistancePairing { .. } => {
+            Pairings::SpatialDistancePairing(SpatialDistancePairing::new(p))
         }
-        p @ PairingSettings::FitnessProportionatePairing => {
-            Pairings::FitnessProportionatePairing(FitnessProportionatePairing::new(p))
-        }
-        p @ PairingSettings::ElitePairing => Pairings::ElitePairing(ElitePairing::new(p)),
-        p @ PairingSettings::AntiElitePairing => {
-            Pairings::AntiElitePairing(AntiElitePairing::new(p))
-        }
-        p @ PairingSettings::SpatialDistancePairing {
-            desired_individual_distance_percentage,
-        } => Pairings::SpatialDistancePairing(SpatialDistancePairing::new(p)),
     }
 }
 

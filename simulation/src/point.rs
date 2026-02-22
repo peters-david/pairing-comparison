@@ -1,3 +1,6 @@
+use rand::rngs::StdRng;
+use rand::RngExt;
+
 #[derive(Debug, Clone)]
 pub struct Point {
     x: f64,
@@ -5,10 +8,10 @@ pub struct Point {
 }
 
 impl Point {
-    pub fn random_01() -> Self {
-        let x = rand::random_range(0.0..1.0);
-        let y = rand::random_range(0.0..1.0);
-        Self { x, y}
+    pub fn random_01(rng: &mut StdRng) -> Self {
+        let x = rng.random_range(0.0..=1.0);
+        let y = rng.random_range(0.0..=1.0);
+        Self { x, y }
     }
 
     pub fn distance(p1: &Self, p2: &Self) -> f64 {
@@ -17,3 +20,4 @@ impl Point {
         (x_delta * x_delta + y_delta * y_delta).sqrt()
     }
 }
+

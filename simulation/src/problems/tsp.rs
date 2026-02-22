@@ -1,6 +1,10 @@
 use std::any::Any;
 
-use rand::seq::{IteratorRandom, SliceRandom};
+use rand::{
+    rngs::StdRng,
+    seq::{IteratorRandom, SliceRandom},
+    RngExt,
+};
 
 use shared::settings::ProblemSettings;
 
@@ -16,12 +20,12 @@ pub struct Cities {
 }
 
 impl Cities {
-    pub fn random(problem_settings: &ProblemSettings) -> Self {
+    pub fn random(rng: &mut StdRng, problem_settings: &ProblemSettings) -> Self {
         let &size = match problem_settings {
             ProblemSettings::Tsp { size } => size,
             _ => panic!("Travelling Salesman Problem requires different kind of settings"),
         };
-        let positions = (0..size).map(|_| Point::random_01()).collect();
+        let positions = (0..size).map(|_| Point::random_01(rng)).collect();
         Self {
             positions,
             problem_settings: problem_settings.clone(),
@@ -52,12 +56,12 @@ impl Cities {
 impl Problem for Cities {
     type Individual = Sequence;
 
-    fn random(problem_settings: &ProblemSettings) -> Self {
-        Self::random(problem_settings)
+    fn random(rng: &mut StdRng, problem_settings: &ProblemSettings) -> Self {
+        Self::random(rng, problem_settings)
     }
 
-    fn random_individual(&self) -> Self::Individual {
-        Sequence::random(self.positions.len())
+    fn random_individual(&self, rng: &mut StdRng) -> Self::Individual {
+        Sequence::random(rng, self.positions.len())
     }
 
     fn fitness(&self, individual: &Self::Individual) -> f64 {
@@ -80,9 +84,9 @@ pub struct Sequence {
 }
 
 impl Sequence {
-    pub fn random(size: usize) -> Self {
+    pub fn random(rng: &mut StdRng, size: usize) -> Self {
         let mut numbers = (0..size).collect::<Vec<usize>>();
-        numbers.shuffle(&mut rand::rng());
+        numbers.shuffle(rng);
         let id = get_id();
         let parent_ids = None;
         Self {
@@ -124,7 +128,7 @@ impl Sequence {
 impl Individual for Sequence {
     type Problem = Cities;
 
-    fn crossover(first: &Self, second: &Self, problem: &Self::Problem) -> Self {
+    fn crossover(rng: &mut StdRng, first: &Self, second: &Self, problem: &Self::Problem) -> Self {
         assert!(
             first.len() == second.len(),
             "Sequences need to be the same length"
@@ -144,7 +148,7 @@ impl Individual for Sequence {
                 second.get_surrounding_numbers(newest_number);
             let random_new_number = (0..size)
                 .filter(|n| !new_numbers.contains(n))
-                .choose(&mut rand::rng())
+                .choose(rng)
                 .expect("Unexpected no number left");
             let possible_numbers = match i % 2 {
                 1 => vec![
@@ -188,10 +192,10 @@ impl Individual for Sequence {
         }
     }
 
-    fn mutate(&mut self, problem: &Cities) {
-        if 0.01 >= rand::random_range(0.0..1.0) {
+    fn mutate(&mut self, rng: &mut StdRng, problem: &Cities) {
+        if 0.01 >= rng.random_range(0.0..1.0) {
             // TODO: mutation rate from settings
-            let swap_indices = (0..self.len()).choose_multiple(&mut rand::rng(), 2);
+            let swap_indices = (0..self.len()).choose_multiple(rng, 2);
             self.numbers.swap(swap_indices[0], swap_indices[1]);
         }
     }
