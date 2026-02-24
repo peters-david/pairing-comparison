@@ -1,7 +1,10 @@
-use crate::{index_reference::ResultFiles, utils::console::console_error, wasm::plotly::newPlot};
+use crate::{
+    hooks::use_run::use_run_result_files, index_reference::ResultFiles,
+    utils::console::console_error, wasm::plotly::newPlot,
+};
 use serde::Serialize;
 use serde_wasm_bindgen::to_value;
-use shared::statistics::{EvaluatedStatistics, Statistics};
+use shared::statistics::{DescriptionFlags, EvaluatedStatistics, Statistics};
 use wasm_bindgen_futures::spawn_local;
 use yew::{
     Html, Properties, function_component, html,
@@ -12,6 +15,7 @@ use yew::{
 #[derive(Properties, PartialEq, Clone)]
 pub struct ResultFilesPlotProps {
     pub result_files: ResultFiles,
+    pub description_flags: DescriptionFlags,
 }
 
 #[function_component(ResultFilesPlot)]
@@ -21,14 +25,33 @@ pub fn result_files_plot(props: &ResultFilesPlotProps) -> Html {
         let result_files = props.result_files.clone();
         let statistics = statistics.clone();
         use_future(|| async move {
+            console_error(&format!("len:{}", result_files.len()));
             statistics.set(Some(result_files.load().await));
         });
     }
     html! {
         if let Some(s) = &*statistics {
-            <StatisticsPlot all_statistics={s.clone()}/>
+            <StatisticsPlot all_statistics={s.clone()} description_flags={props.description_flags.clone()}/>
         } else {
             <h3>{"No data in result files plot"}</h3>
+        }
+    }
+}
+
+#[derive(Properties, PartialEq, Clone)]
+pub struct StaticPlotProps {
+    pub run_id: String,
+    pub description_flags: DescriptionFlags,
+}
+
+#[function_component(StaticPlot)]
+pub fn static_plot(props: &StaticPlotProps) -> Html {
+    let run = use_run_result_files(props.run_id.clone());
+    html! {
+        if let Some(r_f) = &*run {
+            <ResultFilesPlot result_files={r_f.clone()} description_flags={props.description_flags.clone()}/>
+        } else {
+            {"Plot still loading"}
         }
     }
 }
@@ -36,18 +59,32 @@ pub fn result_files_plot(props: &ResultFilesPlotProps) -> Html {
 #[derive(Properties, PartialEq)]
 pub struct StatisticsPlotProps {
     pub all_statistics: Vec<EvaluatedStatistics>,
+    pub description_flags: DescriptionFlags,
 }
 
 #[function_component(StatisticsPlot)]
 pub fn statistics_plot(props: &StatisticsPlotProps) -> Html {
     let data = use_state(|| None::<Vec<Trace>>);
     let layout = Layout {
-        title: "Trace".to_string(),
-        width: 2500,
-        height: 1100,
+        title: Title {
+            text: "".to_string(),
+        },
+        xaxis: Axis {
+            title: Title {
+                text: "Evaluations".to_string(),
+            },
+        },
+        yaxis: Axis {
+            title: Title {
+                text: "Fitness".to_string(),
+            },
+        },
+        width: 1200,
+        height: 600,
     };
     {
         let data = data.clone();
+        let description_flags = props.description_flags.clone();
         use_effect_with(props.all_statistics.clone(), move |statistics| {
             console_error(&format!("{:#?}", statistics));
             let mut traces = statistics
@@ -67,7 +104,7 @@ pub fn statistics_plot(props: &StatisticsPlotProps) -> Html {
                     //     name: name_upper,
                     //     r#type: "scatter".to_string(),
                     // };
-                    let description = t.settings_description();
+                    let description = t.settings_description(&description_flags);
                     let (x, y) = t.x_y();
                     let trace_median = Trace {
                         x,
@@ -116,17 +153,37 @@ struct Trace {
     r#type: String,
 }
 
-impl Trace {
-    fn multiple_from_xs(xs: Vec<Statistics>) -> Vec<Self> {
-        todo!()
-    }
+#[derive(Clone, Serialize, PartialEq)]
+struct Layout {
+    title: Title,
+    xaxis: Axis,
+    yaxis: Axis,
+    width: usize,
+    height: usize,
 }
 
 #[derive(Clone, Serialize, PartialEq)]
-struct Layout {
-    title: String,
+struct Title {
+    text: String,
+}
+
+#[derive(Clone, Serialize, PartialEq)]
+struct Axis {
+    title: Title,
+}
+
+#[derive(Clone, Serialize, PartialEq)]
+struct Config {
+    toImageButtonOptions: ImageOptions,
+}
+
+#[derive(Clone, Serialize, PartialEq)]
+struct ImageOptions {
+    format: String,
+    filename: String,
     width: usize,
     height: usize,
+    scale: usize,
 }
 
 #[derive(Properties, PartialEq)]
@@ -137,14 +194,24 @@ struct TracePlotProps {
 
 #[function_component(TracePlot)]
 fn trace_plot(props: &TracePlotProps) -> Html {
+    let config = Config {
+        toImageButtonOptions: ImageOptions {
+            format: "svg".to_string(),
+            filename: "plot".to_string(),
+            width: 1200,
+            height: 600,
+            scale: 1,
+        },
+    };
     {
         let data = props.data.clone();
         let layout = props.layout.clone();
         use_effect_with(data.clone(), move |data| {
             let plot_data = to_value(&data).expect("Cannot turn trace plot data into js value");
             let layout_data = to_value(&layout).expect("Cannot turn plot layout into js value");
+            let config_data = to_value(&config).expect("Connot turn export config into js value");
 
-            newPlot("plot", &plot_data, &layout_data);
+            newPlot("plot", &plot_data, &layout_data, &config_data);
             || {}
         });
     }

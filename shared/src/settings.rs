@@ -145,7 +145,7 @@ impl PairingSettings {
                 similarity,
             } => {
                 format!(
-                    "Pairing: SimilarFitness<{}>(similarity:{})",
+                    "Pairing: SimilarFitness<{}>(%similarity:{})",
                     quantity.description(),
                     similarity
                 )
@@ -154,7 +154,7 @@ impl PairingSettings {
                 quantity,
                 desired_individual_distance_percentage,
             } => format!(
-                "Pairing: SpatialDistance<{}>({})",
+                "Pairing: SpatialDistance<{}>(%distance:{})",
                 quantity.description(),
                 desired_individual_distance_percentage
             ),

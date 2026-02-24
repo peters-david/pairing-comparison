@@ -5,11 +5,13 @@ mod models;
 mod utils;
 mod wasm;
 
+use shared::statistics::DescriptionFlags;
 use yew::prelude::*;
 
 use crate::{
     components::{
-        plot::ResultFilesPlot, plot_with_settings::PlotWithSettings,
+        plot::{ResultFilesPlot, StaticPlot},
+        plot_with_settings::PlotWithSettings,
         single_plot_settings::SinglePlotSettingsComponent,
     },
     hooks::use_index::{use_index, use_multiple, use_runs},
@@ -34,6 +36,7 @@ fn app() -> Html {
     html! {
         <div>
             <h1>{"Dashboard"}</h1>
+            <StaticPlot run_id={".onexxxxxxxxxxx".to_string()} description_flags={DescriptionFlags::from(true, false, false)} />
             {
                 if let Some(r) = &*runs {
                     html! {

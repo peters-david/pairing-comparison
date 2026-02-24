@@ -7,6 +7,23 @@ use std::{
 };
 
 #[derive(PartialEq, Serialize, Deserialize, Clone, Debug)]
+pub struct DescriptionFlags {
+    show_pairing_settings: bool,
+    show_genetic_algorithm_settings: bool,
+    show_problem_settings: bool,
+}
+
+impl DescriptionFlags {
+    pub fn from(pairing: bool, genetic_algorithm: bool, problem: bool) -> Self {
+        Self {
+            show_pairing_settings: pairing,
+            show_genetic_algorithm_settings: genetic_algorithm,
+            show_problem_settings: problem,
+        }
+    }
+}
+
+#[derive(PartialEq, Serialize, Deserialize, Clone, Debug)]
 pub struct EvaluatedStatistics {
     genetic_algorithm_settings: GeneticAlgorithmSettings,
     problem_settings: ProblemSettings,
@@ -41,12 +58,18 @@ impl EvaluatedStatistics {
             .expect("Could not write to file");
     }
 
-    pub fn settings_description(&self) -> String {
-        self.pairing_settings.description()
-            + " | "
-            + &self.genetic_algorithm_settings.description()
-            + " | "
-            + &self.problem_settings.description()
+    pub fn settings_description(&self, description_flags: &DescriptionFlags) -> String {
+        let mut descriptions = Vec::new();
+        if description_flags.show_pairing_settings {
+            descriptions.push(self.pairing_settings.description());
+        }
+        if description_flags.show_genetic_algorithm_settings {
+            descriptions.push(self.genetic_algorithm_settings.description());
+        }
+        if description_flags.show_problem_settings {
+            descriptions.push(self.problem_settings.description());
+        }
+        descriptions.join(" | ")
     }
 
     pub fn x_y(&self) -> (Vec<usize>, Vec<f64>) {

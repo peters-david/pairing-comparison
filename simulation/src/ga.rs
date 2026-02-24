@@ -59,7 +59,7 @@ impl<P: Problem<Individual = I>, X: Pairing<I>, I: Individual<Problem = P>>
         let mut individuals = (0..self.genetic_algorithm_settings.population_size())
             .map(|_| {
                 let mut individual = self.problem.random_individual(rng);
-                (0..10).for_each(|_| individual.mutate(rng, &self.problem));
+                individual.mutate(rng, &self.problem);
                 individual
             })
             .collect();

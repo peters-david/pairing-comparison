@@ -1,4 +1,4 @@
-use shared::statistics::EvaluatedStatistics;
+use shared::statistics::{DescriptionFlags, EvaluatedStatistics};
 use wasm_bindgen_futures::spawn_local;
 use yew::{
     Callback, Html, MouseEvent, Properties, function_component, html, use_effect_with, use_state,
@@ -85,7 +85,7 @@ pub fn plot_with_settings(props: &PlotWithSettingsProps) -> Html {
             {
                 if let Some(f_e_s) = &*filtered_evaluated_statistics {
                     html! {
-                        <StatisticsPlot all_statistics={f_e_s.clone()} />
+                        <StatisticsPlot all_statistics={f_e_s.clone()} description_flags={DescriptionFlags::from(true, true, true)} />
                     }
                 } else {
                     html! {

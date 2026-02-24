@@ -3,7 +3,11 @@ mod point;
 mod problems;
 mod synchronization;
 
-use std::{fs::read_dir, sync::Arc};
+use std::{
+    fs::{read_dir, remove_dir_all},
+    path::Path,
+    sync::Arc,
+};
 
 use chrono::Local;
 use clap::Parser;
@@ -33,41 +37,100 @@ struct Args {
 }
 
 fn main() {
-    print!("\x1B[2J\x1B[1;1H"); // clear
+    one();
+}
+
+fn one() {
+    // rofa settings ranges
+    // TODO: costs can also be parameterized
+    let nodes: Vec<usize> = (30..=30).step_by(10).collect();
+    let links_percentage: Vec<usize> = (30..=30).step_by(30).collect(); // the minimum links required are nodes - 1
+    let demands_percentage: Vec<usize> = (70..=70).step_by(30).collect();
+    let link_types: Vec<usize> = (6..=12).step_by(8).collect();
+    let cfa_settings = (nodes, links_percentage, demands_percentage, link_types);
+
+    // genetic algorithm settings
+    let population_size_and_generations = vec![(200, 5000)];
+    let survival_rate: Vec<f64> = (5..=5).step_by(4).map(|n| n as f64 * 0.1).collect();
+    let mutation_rate = vec![0.005];
+    let mutation_strength = vec![1];
+    let ga_settings = (
+        population_size_and_generations,
+        survival_rate,
+        mutation_rate,
+        mutation_strength,
+    );
+
+    // layer 1
+    let mut individual_quantities = vec![
+        IndividualQuantity::Random,
+        IndividualQuantity::FitnessProportionate,
+    ];
+    for p in [5] {
+        individual_quantities.extend(vec![
+            IndividualQuantity::Elite { percentage: p },
+            IndividualQuantity::AntiElite { percentage: p },
+        ]);
+    }
+
+    //layer 2
+    let mut pairing_settings = Vec::new();
+    for i_q in individual_quantities {
+        pairing_settings.extend(vec![
+            // PairingSettings::AsexualPairing { quantity: i_q },
+            PairingSettings::RandomPairing { quantity: i_q },
+        ]);
+        // for s in [3] {
+        //     pairing_settings.push(PairingSettings::SimilarFitnessPairing {
+        //         quantity: i_q,
+        //         similarity: s,
+        //     });
+        // }
+        // for d_i_d_p in [3] {
+        //     pairing_settings.push(PairingSettings::SpatialDistancePairing {
+        //         quantity: i_q,
+        //         desired_individual_distance_percentage: d_i_d_p,
+        //     });
+        // }
+    }
+
+    run(
+        &"onexxxxxxxxxxx".to_string(),
+        cfa_settings,
+        ga_settings,
+        pairing_settings,
+    );
+}
+
+fn run(
+    run_id: &String,
+    cfa_settings: (Vec<usize>, Vec<usize>, Vec<usize>, Vec<usize>),
+    ga_settings: (Vec<(usize, usize)>, Vec<f64>, Vec<f64>, Vec<usize>),
+    pairing_settings: Vec<PairingSettings>,
+) {
+    // print!("\x1B[2J\x1B[1;1H"); // clear
+    println!("{}", run_id);
     let mut pool = ThreadPool::new(number_cpus());
     let mut first_level_rng = StdRng::seed_from_u64(0u64);
 
     let args = Args::parse();
-    let (run_id, existing_unique_numbers) = match args.resume {
+    let existing_unique_numbers = match args.resume {
         true => {
-            let run_id = last_run();
             let existing_unique_numbers = existing_unique_numbers(&run_id);
-            (run_id, existing_unique_numbers)
+            existing_unique_numbers
         }
         false => {
-            let run_id = Local::now().format("%Y%m%d%H%M%S").to_string();
+            if Path::new(&format!(".{}", run_id)).exists() {
+                remove_dir_all(format!(".{}", run_id)).expect("Could not remove previous run");
+                println!("Removed previous run");
+            }
             let existing_unique_numbers = vec![];
-            (run_id, existing_unique_numbers)
+            existing_unique_numbers
         }
     };
 
-    // tsp settings ranges
-    let size = (30..=50).step_by(20);
-
+    let (nodes, links_percentage, demands_percentage, link_types) = cfa_settings;
     let mut problem_settings = Vec::new();
-    for s in size {
-        // problem_settings.push(ProblemSettings::Tsp { size: s });
-    }
-
-    // rofa settings ranges
-    // TODO: costs can also be parameterized
-    let nodes = (40..=40).step_by(50);
-    let links_percentage = (20..=40).step_by(30); // the minimum links required are nodes - 1
-    let demands_percentage = (50..=50).step_by(30);
-    let link_types = (8..=12).step_by(8);
-
-    // here problemsettings are pushed together
-    //let mut problem_settings = Vec::new();
     for (n, l_p, d_p, l_t) in iproduct!(nodes, links_percentage, demands_percentage, link_types) {
         problem_settings.push(ProblemSettings::Rofa {
             nodes: n,
@@ -94,12 +157,8 @@ fn main() {
         });
     }
 
-    // genetic algorithm settings
-    let population_size_and_generations = vec![(10, 200)];
-    let survival_rate: Vec<f64> = (5..=5).step_by(4).map(|n| n as f64 * 0.1).collect();
-    let mutation_rate = vec![0.01, 0.05, 0.3];
-    let mutation_strength = vec![1];
-
+    let (population_size_and_generations, survival_rate, mutation_rate, mutation_strength) =
+        ga_settings;
     let mut genetic_algorithm_settings = Vec::new();
     for ((p, g), s, m_r, m_s) in iproduct!(
         population_size_and_generations,
@@ -110,45 +169,13 @@ fn main() {
         genetic_algorithm_settings.push(GeneticAlgorithmSettings::new(p, s, g, m_r, m_s));
     }
 
-    let mut individual_quantities = vec![
-        // IndividualQuantity::Random,
-        // IndividualQuantity::FitnessProportionate,
-    ];
-
-    for p in [20] {
-        individual_quantities.extend(vec![
-            IndividualQuantity::Elite { percentage: p },
-            // IndividualQuantity::AntiElite { percentage: p },
-        ]);
-    }
-
-    let mut pairing_settings = Vec::new();
-    for i_q in individual_quantities {
-        // pairing_settings.extend(vec![
-        //     PairingSettings::AsexualPairing { quantity: i_q },
-        //     PairingSettings::RandomPairing { quantity: i_q },
-        // ]);
-        // for s in [3, 5, 10, 20, 30, 40, 50] {
-        //     pairing_settings.push(PairingSettings::SimilarFitnessPairing {
-        //         quantity: i_q,
-        //         similarity: s,
-        //     });
-        // }
-        for d_i_d_p in [1, 2, 3, 5, 10, 20, 50, 100] {
-            pairing_settings.push(PairingSettings::SpatialDistancePairing {
-                quantity: i_q,
-                desired_individual_distance_percentage: d_i_d_p,
-            });
-        }
-    }
-
     let m = Arc::new(MultiProgress::with_draw_target(
         indicatif::ProgressDrawTarget::stderr_with_hz(8),
     ));
-    let style = ProgressStyle::with_template("{msg:<12} [{bar:100.cyan/blue}] {pos}/{len} ({eta})")
+    let style = ProgressStyle::with_template("{msg:<15} [{bar:100.cyan/blue}] {pos}/{len} ({eta})")
         .expect("Could not create progress bar style");
 
-    let iterations: usize = 1;
+    let iterations: usize = 100;
     let total_executions =
         genetic_algorithm_settings.len() * pairing_settings.len() * problems.len()
             - existing_unique_numbers.len();
@@ -176,7 +203,7 @@ fn main() {
                 let progress_bar = m.add(ProgressBar::new(iterations as u64));
                 progress_bar.set_style(
                     ProgressStyle::with_template(
-                        "{msg:<12} [{bar:100.cyan/blue}] {pos}/{len} ({eta})",
+                        "{msg:<15} [{bar:100.cyan/blue}] {pos}/{len} ({eta})",
                     )
                     .expect("Could not create progress bar style"),
                 );
