@@ -36,6 +36,9 @@ fn app() -> Html {
     html! {
         <div>
             <h1>{"Dashboard"}</h1>
+            <h3>{"Two"}</h3>
+            <StaticPlot run_id={".twoxxxxxxxxxxx".to_string()} description_flags={DescriptionFlags::from(true, false, false)} />
+            <h3>{"One"}</h3>
             <StaticPlot run_id={".onexxxxxxxxxxx".to_string()} description_flags={DescriptionFlags::from(true, false, false)} />
             {
                 if let Some(r) = &*runs {

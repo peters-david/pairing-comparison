@@ -14,6 +14,7 @@ use yew::{
 
 #[derive(Properties, PartialEq, Clone)]
 pub struct ResultFilesPlotProps {
+    pub name: String,
     pub result_files: ResultFiles,
     pub description_flags: DescriptionFlags,
 }
@@ -31,7 +32,7 @@ pub fn result_files_plot(props: &ResultFilesPlotProps) -> Html {
     }
     html! {
         if let Some(s) = &*statistics {
-            <StatisticsPlot all_statistics={s.clone()} description_flags={props.description_flags.clone()}/>
+            <StatisticsPlot name={props.name.clone()} all_statistics={s.clone()} description_flags={props.description_flags.clone()}/>
         } else {
             <h3>{"No data in result files plot"}</h3>
         }
@@ -49,7 +50,7 @@ pub fn static_plot(props: &StaticPlotProps) -> Html {
     let run = use_run_result_files(props.run_id.clone());
     html! {
         if let Some(r_f) = &*run {
-            <ResultFilesPlot result_files={r_f.clone()} description_flags={props.description_flags.clone()}/>
+            <ResultFilesPlot name={props.run_id.clone()} result_files={r_f.clone()} description_flags={props.description_flags.clone()}/>
         } else {
             {"Plot still loading"}
         }
@@ -58,6 +59,7 @@ pub fn static_plot(props: &StaticPlotProps) -> Html {
 
 #[derive(Properties, PartialEq)]
 pub struct StatisticsPlotProps {
+    pub name: String,
     pub all_statistics: Vec<EvaluatedStatistics>,
     pub description_flags: DescriptionFlags,
 }
@@ -79,8 +81,8 @@ pub fn statistics_plot(props: &StatisticsPlotProps) -> Html {
                 text: "Fitness".to_string(),
             },
         },
-        width: 1200,
-        height: 600,
+        // width: 1200,
+        // height: 600,
     };
     {
         let data = data.clone();
@@ -138,7 +140,7 @@ pub fn statistics_plot(props: &StatisticsPlotProps) -> Html {
     }
     html! {
         if let Some(d) = (*data).clone() {
-            <TracePlot data={d} layout={layout} />
+            <TracePlot name={props.name.clone()} data={d} layout={layout} />
         } else {
             <h1>{"No data in statistics plot"}</h1>
         }
@@ -158,8 +160,8 @@ struct Layout {
     title: Title,
     xaxis: Axis,
     yaxis: Axis,
-    width: usize,
-    height: usize,
+    // width: usize,
+    // height: usize,
 }
 
 #[derive(Clone, Serialize, PartialEq)]
@@ -174,6 +176,7 @@ struct Axis {
 
 #[derive(Clone, Serialize, PartialEq)]
 struct Config {
+    responsive: bool,
     toImageButtonOptions: ImageOptions,
 }
 
@@ -188,6 +191,7 @@ struct ImageOptions {
 
 #[derive(Properties, PartialEq)]
 struct TracePlotProps {
+    name: String,
     data: Vec<Trace>,
     layout: Layout,
 }
@@ -195,6 +199,7 @@ struct TracePlotProps {
 #[function_component(TracePlot)]
 fn trace_plot(props: &TracePlotProps) -> Html {
     let config = Config {
+        responsive: true,
         toImageButtonOptions: ImageOptions {
             format: "svg".to_string(),
             filename: "plot".to_string(),
@@ -206,17 +211,18 @@ fn trace_plot(props: &TracePlotProps) -> Html {
     {
         let data = props.data.clone();
         let layout = props.layout.clone();
+        let name = props.name.clone();
         use_effect_with(data.clone(), move |data| {
             let plot_data = to_value(&data).expect("Cannot turn trace plot data into js value");
             let layout_data = to_value(&layout).expect("Cannot turn plot layout into js value");
             let config_data = to_value(&config).expect("Connot turn export config into js value");
 
-            newPlot("plot", &plot_data, &layout_data, &config_data);
+            newPlot(&name, &plot_data, &layout_data, &config_data);
             || {}
         });
     }
 
     html! {
-        <div id="plot"></div>
+        <div id={props.name.clone()}></div>
     }
 }

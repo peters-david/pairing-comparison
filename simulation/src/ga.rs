@@ -56,9 +56,10 @@ impl<P: Problem<Individual = I>, X: Pairing<I>, I: Individual<Problem = P>>
     }
 
     pub fn run(&mut self, rng: &mut StdRng, unique_number: usize, progress_bar: ProgressBar) {
+        let base_individual = self.problem.random_individual(rng);
         let mut individuals = (0..self.genetic_algorithm_settings.population_size())
             .map(|_| {
-                let mut individual = self.problem.random_individual(rng);
+                let mut individual = base_individual.clone();
                 individual.mutate(rng, &self.problem);
                 individual
             })
@@ -580,16 +581,22 @@ impl<const N: usize> Space<N> {
             .expect("Individual not in space positions");
         let mut distances_and_ids = Vec::new();
         for (&id_other, position_other) in &self.positions {
-            let distance = Position::distance(position_individual, position_other);
-            distances_and_ids.push((distance, id_other));
+            if existing_ids.contains(&id_other) {
+                let distance = Position::distance(position_individual, position_other);
+                distances_and_ids.push((distance, id_other));
+            }
         }
+        assert!(
+            !distances_and_ids.is_empty(),
+            "Distances and ids can not be empty"
+        );
         distances_and_ids.sort_by(|a, b| {
             a.0.partial_cmp(&b.0)
                 .expect("Could not order ids by distance")
         });
         assert!(!distances_and_ids.is_empty(), "Distances can not be empty");
         let mut delta_distances_and_ids = Vec::new();
-        for delta in 0..desired_individual_distance_number {
+        for delta in 0..=desired_individual_distance_number {
             let new_desired_disance = desired_individual_distance_number + delta;
             match distances_and_ids.get(new_desired_disance) {
                 None => {}
@@ -601,11 +608,6 @@ impl<const N: usize> Space<N> {
                 Some(&d_a_i) => delta_distances_and_ids.push(d_a_i),
             };
         }
-        delta_distances_and_ids.retain(|(_, id)| existing_ids.contains(id));
-        assert!(
-            !delta_distances_and_ids.is_empty(),
-            "Distances and ids can not be empty"
-        );
         delta_distances_and_ids.remove(0).1
     }
 }

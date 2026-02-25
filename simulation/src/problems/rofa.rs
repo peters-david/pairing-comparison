@@ -382,7 +382,7 @@ impl Rofa {
             as usize
             + links_min;
         let demands_min = 1;
-        let demands_max = number_links; // TODO: correct value
+        let demands_max = number_nodes * (number_nodes - 1) / 2;
         let number_demands = ((demands_max - demands_min) as f64 * demands_percentage as f64 * 0.01)
             .ceil() as usize
             + demands_min;
@@ -584,6 +584,7 @@ impl RoutingPlan {
         let mut first_part = Self::any_route(&problem.network, first, intermediate);
         let second_part = Self::any_route(&problem.network, intermediate, second);
         first_part.pop();
+        //TODO if first_part.contains check for duplicates
         let mut mutated_route = Vec::new();
         mutated_route.extend(first_part);
         mutated_route.extend(second_part);

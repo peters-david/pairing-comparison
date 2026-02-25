@@ -85,7 +85,7 @@ pub fn plot_with_settings(props: &PlotWithSettingsProps) -> Html {
             {
                 if let Some(f_e_s) = &*filtered_evaluated_statistics {
                     html! {
-                        <StatisticsPlot all_statistics={f_e_s.clone()} description_flags={DescriptionFlags::from(true, true, true)} />
+                        <StatisticsPlot name={"All"} all_statistics={f_e_s.clone()} description_flags={DescriptionFlags::from(true, true, true)} />
                     }
                 } else {
                     html! {
