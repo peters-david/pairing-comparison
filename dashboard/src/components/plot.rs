@@ -68,21 +68,40 @@ pub struct StatisticsPlotProps {
 pub fn statistics_plot(props: &StatisticsPlotProps) -> Html {
     let data = use_state(|| None::<Vec<Trace>>);
     let layout = Layout {
-        title: Title {
-            text: "".to_string(),
+        title: None,
+        margins: Margins {
+            l: 0,
+            r: 0,
+            t: 0,
+            b: 0,
+            pad: 0,
         },
+        autosize: false,
         xaxis: Axis {
+            showline: true,
             title: Title {
                 text: "Evaluations".to_string(),
+                font: Size { size: 22 },
+                standoff: 0,
             },
+            tickfont: Size { size: 16 },
+            automargin: true,
+            domain: (0.0, 1.0),
         },
         yaxis: Axis {
+            showline: true,
             title: Title {
                 text: "Fitness".to_string(),
+                font: Size { size: 22 },
+                standoff: 0,
             },
+            tickfont: Size { size: 16 },
+            automargin: true,
+            domain: (0.0, 1.0),
         },
-        // width: 1200,
-        // height: 600,
+        legend: Font {
+            font: Size { size: 16 },
+        },
     };
     {
         let data = data.clone();
@@ -156,22 +175,53 @@ struct Trace {
 }
 
 #[derive(Clone, Serialize, PartialEq)]
+struct Margins {
+    l: usize,
+    r: usize,
+    t: usize,
+    b: usize,
+    pad: usize,
+}
+
+#[derive(Clone, Serialize, PartialEq)]
+struct Mode {
+    mode: bool,
+}
+
+#[derive(Clone, Serialize, PartialEq)]
 struct Layout {
-    title: Title,
+    title: Option<String>,
+    margins: Margins,
+    autosize: bool,
     xaxis: Axis,
     yaxis: Axis,
-    // width: usize,
-    // height: usize,
+    legend: Font,
+}
+
+#[derive(Clone, Serialize, PartialEq)]
+struct Font {
+    font: Size,
+}
+
+#[derive(Clone, Serialize, PartialEq)]
+struct Size {
+    size: usize,
 }
 
 #[derive(Clone, Serialize, PartialEq)]
 struct Title {
     text: String,
+    font: Size,
+    standoff: usize,
 }
 
 #[derive(Clone, Serialize, PartialEq)]
 struct Axis {
+    showline: bool,
     title: Title,
+    tickfont: Size,
+    automargin: bool,
+    domain: (f64, f64),
 }
 
 #[derive(Clone, Serialize, PartialEq)]
@@ -203,8 +253,8 @@ fn trace_plot(props: &TracePlotProps) -> Html {
         toImageButtonOptions: ImageOptions {
             format: "svg".to_string(),
             filename: "plot".to_string(),
-            width: 1200,
-            height: 600,
+            width: 1000,
+            height: 500,
             scale: 1,
         },
     };
@@ -223,6 +273,6 @@ fn trace_plot(props: &TracePlotProps) -> Html {
     }
 
     html! {
-        <div id={props.name.clone()}></div>
+        <div id={props.name.clone()} style={"padding: 0; margin: 0;"}></div>
     }
 }

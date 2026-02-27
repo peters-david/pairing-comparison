@@ -135,28 +135,28 @@ impl PairingSettings {
     pub fn description(&self) -> String {
         match self {
             PairingSettings::AsexualPairing { quantity } => {
-                format!("Pairing: Asexual<{}>", quantity.description())
+                format!("Asexual<{}>", quantity.description())
             }
             PairingSettings::RandomPairing { quantity } => {
-                format!("Pairing: Random<{}>", quantity.description())
+                format!("Random<{}>", quantity.description())
             }
             PairingSettings::SimilarFitnessPairing {
                 quantity,
                 similarity,
             } => {
                 format!(
-                    "Pairing: SimilarFitness<{}>(%similarity:{})",
+                    "SimilarFitness({}%)<{}>",
+                    similarity,
                     quantity.description(),
-                    similarity
                 )
             }
             PairingSettings::SpatialDistancePairing {
                 quantity,
                 desired_individual_distance_percentage,
             } => format!(
-                "Pairing: SpatialDistance<{}>(%distance:{})",
+                "SpatialDistance({}%)<{}>",
+                desired_individual_distance_percentage,
                 quantity.description(),
-                desired_individual_distance_percentage
             ),
         }
     }

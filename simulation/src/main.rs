@@ -37,8 +37,71 @@ struct Args {
 }
 
 fn main() {
+    three();
     two();
-    one();
+    // one();
+}
+
+fn three() {
+    // rofa settings ranges
+    // TODO: costs can also be parameterized
+    let nodes: Vec<usize> = (20..=20).step_by(10).collect();
+    let links_percentage: Vec<usize> = (50..=50).step_by(30).collect(); // the minimum links required are nodes - 1
+    let demands_percentage: Vec<usize> = (70..=70).step_by(30).collect();
+    let link_types: Vec<usize> = (15..=15).step_by(8).collect();
+    let cfa_settings = (nodes, links_percentage, demands_percentage, link_types);
+
+    // genetic algorithm settings
+    let population_size_and_generations = vec![(100, 2000)];
+    let survival_rate: Vec<f64> = (5..=5).step_by(4).map(|n| n as f64 * 0.1).collect();
+    let mutation_rate = vec![0.01];
+    let mutation_strength = vec![1];
+    let ga_settings = (
+        population_size_and_generations,
+        survival_rate,
+        mutation_rate,
+        mutation_strength,
+    );
+
+    // layer 1
+    let mut individual_quantities = vec![
+        IndividualQuantity::Random,
+        // IndividualQuantity::FitnessProportionate,
+    ];
+    for p in [5] {
+        // individual_quantities.extend(vec![
+        //     IndividualQuantity::Elite { percentage: p },
+        //     IndividualQuantity::AntiElite { percentage: p },
+        // ]);
+    }
+
+    //layer 2
+    let mut pairing_settings = Vec::new();
+    for i_q in individual_quantities {
+        // pairing_settings.extend(vec![
+        //     PairingSettings::AsexualPairing { quantity: i_q },
+        //     PairingSettings::RandomPairing { quantity: i_q },
+        // ]);
+        // for s in [8] {
+        //     pairing_settings.push(PairingSettings::SimilarFitnessPairing {
+        //         quantity: i_q,
+        //         similarity: s,
+        //     });
+        // }
+        for d_i_d_p in 0..100 {
+            pairing_settings.push(PairingSettings::SpatialDistancePairing {
+                quantity: i_q,
+                desired_individual_distance_percentage: d_i_d_p,
+            });
+        }
+    }
+
+    run(
+        &"threexxxxxxxxx".to_string(),
+        cfa_settings,
+        ga_settings,
+        pairing_settings,
+    );
 }
 
 fn two() {
