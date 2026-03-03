@@ -39,9 +39,9 @@ struct Args {
 
 fn main() {
     // e1();
-    // e2();
-    // e3();
-    // e4();
+    e2();
+    e3();
+    e4();
     // e5a();
     // e5b();
     // e6a();
@@ -49,7 +49,7 @@ fn main() {
     // e7();
     // e8();
     // e10();
-    e11();
+    // e11();
 }
 
 fn e1() {
@@ -222,7 +222,7 @@ fn e4() {
 
 fn e5a() {
     let cfa_settings = (vec![25], vec![30], vec![20], vec![15]);
-    let ga_settings = (vec![(100, 2000)], vec![0.9], vec![0.01], vec![1]);
+    let ga_settings = (vec![(100, 3000)], vec![0.9], vec![0.01], vec![1]);
     let mut individual_quantities = vec![
         IndividualQuantity::Random,
         // IndividualQuantity::FitnessProportionate,
@@ -264,7 +264,7 @@ fn e5a() {
 
 fn e5b() {
     let cfa_settings = (vec![25], vec![30], vec![20], vec![15]);
-    let ga_settings = (vec![(100, 2000)], vec![0.1], vec![0.01], vec![1]);
+    let ga_settings = (vec![(100, 3000)], vec![0.1], vec![0.01], vec![1]);
     let mut individual_quantities = vec![
         IndividualQuantity::Random,
         // IndividualQuantity::FitnessProportionate,
@@ -559,7 +559,7 @@ fn e10() {
 
 fn e11() {
     let cfa_settings = (vec![25], vec![30], vec![20], vec![15]);
-    let ga_settings = (vec![(2, 200000)], vec![0.5], vec![0.5], vec![1]);
+    let ga_settings = (vec![(2, 200000)], vec![0.4], vec![0.1], vec![1]);
     let mut individual_quantities = vec![
         // IndividualQuantity::Random,
         // IndividualQuantity::FitnessProportionate,
@@ -852,7 +852,6 @@ fn exhaustive_search(run_id: &String, cfa_setting: (usize, usize, usize, usize))
         (0usize, f64::MIN),
         |(count, current_max), item| {
             let new_max = current_max.max(item);
-            dbg!(new_max);
             (count + 1, new_max)
         },
     );

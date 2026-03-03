@@ -6,6 +6,7 @@ use std::{
 };
 
 use indicatif::ProgressBar;
+use itertools::Itertools;
 use rand::{prelude::SliceRandom, rngs::StdRng, RngExt};
 use rand_distr::{Distribution, Normal};
 use shared::{
@@ -126,9 +127,8 @@ impl<P: Problem<Individual = I>, X: Pairing<I>, I: Individual<Problem = P>>
     fn mutate(&self, rng: &mut StdRng, mut individuals: Vec<I>) -> Vec<I> {
         if individuals.len() == 2 {
             // 1+1 evolutionary
-            println!("1+1");
             for _ in 0..self.genetic_algorithm_settings.mutation_strength() {
-                individuals[0].mutate(rng, &self.problem);
+                individuals[1].mutate(rng, &self.problem);
             }
         } else {
             for individual in &mut individuals {

@@ -480,7 +480,6 @@ impl Problem for Rofa {
         let routing_and_capacity_plan = (individual as &dyn Any)
             .downcast_ref::<RoutingAndCapacityPlan>()
             .expect("Cannot downcast individual to sequence");
-        dbg!(-self.cost(routing_and_capacity_plan));
         -self.cost(routing_and_capacity_plan)
     }
 
@@ -918,6 +917,7 @@ impl Individual for RoutingAndCapacityPlan {
 
     fn mutate(&mut self, rng: &mut StdRng, problem: &Self::Problem) {
         self.routing_plan.mutate(rng, problem);
+        self.links_demands = Self::calculate_links_demands(problem, &self.routing_plan);
         self.capacity_plan
             .mutate(rng, self.get_links_demands(), problem);
         self.capacity_plan
