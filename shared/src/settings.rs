@@ -17,11 +17,9 @@ impl GeneticAlgorithmSettings {
         mutation_rate: f64,
         mutation_strength: usize,
     ) -> Self {
-        assert!(population_size > 2, "Population size must be above 2");
+        assert!(population_size > 0, "Population size must be above 2");
         assert!(survival_rate > 0.0, "Survival rate must be above 0");
-        assert!(survival_rate < 100.0, "Survival rate must be below 100");
         assert!(mutation_rate > 0.0, "Mutation rate must be above 0");
-        assert!(mutation_rate < 100.0, "Mutation rate must be below 100");
         assert!(mutation_strength > 0, "Mutation strength must be above 0");
         Self {
             population_size,

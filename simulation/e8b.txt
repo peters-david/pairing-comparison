@@ -1,0 +1,2 @@
+length:236196,nodes:4,links:5,demands:6,link_types:3
+best:-1.4343006209504463

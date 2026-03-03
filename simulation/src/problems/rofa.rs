@@ -2,9 +2,10 @@
 /// **IMPORTANT:** This assumes nodes have continuous, gapless ids starting from 0.
 use std::{
     any::Any,
-    collections::{BTreeMap, BTreeSet, VecDeque},
+    collections::{BTreeMap, BTreeSet, HashSet, VecDeque},
 };
 
+use itertools::{repeat_n, Itertools};
 use rand::{
     rngs::StdRng,
     seq::{IndexedRandom, IteratorRandom},
@@ -70,21 +71,39 @@ impl BidirectionalLink {
     fn random_links(rng: &mut StdRng, nodes: &Vec<Node>, number_links: usize) -> Vec<Self> {
         let number_nodes = nodes.len();
         let mut links = Vec::with_capacity(number_links);
-        for _ in 0..number_links {
-            let mut between = (
-                rng.random_range(0..number_nodes),
-                rng.random_range(0..number_nodes),
-            );
-            while between.0 == between.1
-                || links
-                    .iter()
-                    .any(|l: &BidirectionalLink| l.is_between(between))
-            {
-                between = (
-                    rng.random_range(0..number_nodes),
-                    rng.random_range(0..number_nodes),
-                );
+        let mut reachable = Vec::new();
+        for _ in 0..(nodes.len() - 1) {
+            let first_id = match reachable.is_empty() {
+                true => {
+                    let first_id = rng.random_range(0..number_nodes);
+                    reachable.push(first_id);
+                    first_id
+                }
+                false => *reachable
+                    .choose(rng)
+                    .expect("Could not choose reachable node"),
+            };
+            let second_id = (0..number_nodes)
+                .filter(|id| !reachable.contains(id))
+                .choose(rng)
+                .expect("Could not choose new node");
+            reachable.push(second_id);
+            let between = (first_id, second_id);
+            links.push(BidirectionalLink::between(between));
+        }
+        for _ in 0..(number_links - reachable.len()) {
+            let mut first = rng.random_range(0..number_nodes);
+            let mut possible_second = (0..number_nodes)
+                .filter(|&id| first != id && !links.iter().any(|l| l.is_between((first, id))))
+                .choose(rng);
+            while possible_second.is_none() {
+                first = rng.random_range(0..number_nodes);
+                possible_second = (0..number_nodes)
+                    .filter(|&id| first != id && !links.iter().any(|l| l.is_between((first, id))))
+                    .choose(rng);
             }
+            let second = possible_second.expect("Second should be some");
+            let between = (first, second);
             links.push(BidirectionalLink::between(between));
         }
         links
@@ -115,6 +134,10 @@ impl BidirectionalDemand {
             demand_nodes,
             required_traffic,
         }
+    }
+
+    fn nodes(&self) -> (Id, Id) {
+        self.demand_nodes
     }
 
     fn is_between(&self, nodes: (Id, Id)) -> bool {
@@ -287,8 +310,8 @@ struct CapacityType {
 
 impl CapacityType {
     fn from_percentage(percentage: f64, number_demands: usize, number_links: usize) -> Self {
-        let max_capacity = 2.0 * number_demands as f64; // maximum demand of 1.0
-        let capacity = percentage * max_capacity;
+        let max_capacity = number_demands as f64; // maximum demand of 1.0
+        let capacity = percentage.powi(2) * max_capacity;
         let max_fixed_cost = 1.0 / number_links as f64;
         let fixed_cost = percentage.powf(1.0 / 3.0) * max_fixed_cost; // in range [0,1]
         let variable_cost = percentage * max_fixed_cost;
@@ -363,6 +386,14 @@ pub struct Rofa {
 }
 
 impl Rofa {
+    pub fn number_links(&self) -> usize {
+        self.network.links.len()
+    }
+
+    pub fn number_demands(&self) -> usize {
+        self.demands.len()
+    }
+
     pub fn random(rng: &mut StdRng, problem_settings: &ProblemSettings) -> Self {
         let (number_nodes, links_percentage, demands_percentage, number_link_types) =
             match problem_settings {
@@ -397,7 +428,7 @@ impl Rofa {
         }
     }
 
-    fn cost(&self, routing_and_capacity_plan: &RoutingAndCapacityPlan) -> f64 {
+    pub fn cost(&self, routing_and_capacity_plan: &RoutingAndCapacityPlan) -> f64 {
         let planned_capacity_types = &routing_and_capacity_plan
             .capacity_plan
             .planned_capacity_types;
@@ -411,10 +442,9 @@ impl Rofa {
             all_links_demands.iter().zip(planned_capacity_types)
         {
             let cap = planned_capacity_type.capacity;
-            assert!(
-                planned_capacity_type.capacity >= total_demand,
-                "{cap} vs {total_demand} Demand cannot be bigger than capacity"
-            );
+            if cap < total_demand {
+                return 100.0;
+            }
 
             let delay = total_demand
                 * (total_demand / planned_capacity_type.capacity).powi(CONGESTION_EXPONENT);
@@ -426,9 +456,8 @@ impl Rofa {
         let number_links = all_links_demands.len();
         let delay_cost =
             (unweighted_delay_cost / (number_links as f64)).powf(DELAY_SCALING_EXPONENT);
-        fixed_cost /= 10.0;
 
-        //println!("{}/{}/{}", delay_cost, fixed_cost, variable_cost); // TODO
+        // println!("{}/{}/{}", delay_cost, fixed_cost, variable_cost); // TODO
         delay_cost + fixed_cost + variable_cost
     }
 }
@@ -451,6 +480,7 @@ impl Problem for Rofa {
         let routing_and_capacity_plan = (individual as &dyn Any)
             .downcast_ref::<RoutingAndCapacityPlan>()
             .expect("Cannot downcast individual to sequence");
+        dbg!(-self.cost(routing_and_capacity_plan));
         -self.cost(routing_and_capacity_plan)
     }
 
@@ -479,6 +509,85 @@ impl RoutingPlan {
             "Number of routings and demands should be identical"
         );
         Self { routes }
+    }
+
+    fn route_crossover(rng: &mut StdRng, first: Route, second: Route) -> Route {
+        let first_intermediates: BTreeSet<usize> = first.clone().into_iter().collect();
+        let second_intermediates: BTreeSet<usize> = second.clone().into_iter().collect();
+        let common: Vec<usize> = first_intermediates
+            .intersection(&second_intermediates)
+            .cloned()
+            .collect();
+        let common_filtered: Vec<usize> = common
+            .into_iter()
+            .filter(|&id| {
+                id != *first.first().expect("Cannot get start id")
+                    && id != *first.last().expect("Cannot get end id")
+            })
+            .collect();
+        if common_filtered.is_empty() {
+            return first;
+        } else {
+            let crossover_id = common_filtered
+                .choose(rng)
+                .expect("Cannot choose common id");
+            let first_part: Vec<usize> = first
+                .into_iter()
+                .take_while(|id| id != crossover_id)
+                .collect();
+            let second_part: Vec<usize> = second
+                .into_iter()
+                .skip_while(|id| id != crossover_id)
+                .collect();
+            let mut route = Vec::new();
+            route.extend(first_part);
+            route.extend(second_part);
+            route
+        }
+    }
+
+    fn exhaustive_and_length(network: &Network, demands: &Vec<BidirectionalDemand>) -> Vec<Self> {
+        let mut route_possibilities = Vec::new();
+        for demand in demands {
+            let (from, to) = demand.demand_nodes;
+            route_possibilities.push(Self::all_routes(network, from, to));
+        }
+        let mut routing_plans = Vec::new();
+        for route_combination in route_possibilities
+            .into_iter()
+            .map(|v| v.into_iter())
+            .multi_cartesian_product()
+        {
+            routing_plans.push(Self {
+                routes: route_combination,
+            })
+        }
+        routing_plans
+    }
+
+    fn all_routes(network: &Network, from: Id, to: Id) -> Vec<Route> {
+        assert!(from != to, "Should not need route from node to itself");
+        let mut all_routes = Vec::new();
+        let mut stack = Vec::new();
+        let mut visited = HashSet::new();
+        visited.insert(from);
+        stack.push((from, vec![from], visited));
+        while let Some((node, path, visited)) = stack.pop() {
+            if node == to {
+                all_routes.push(path);
+                continue;
+            }
+            for neighbor in network.neighbors(node) {
+                if !visited.contains(&neighbor) {
+                    let mut new_path = path.clone();
+                    new_path.push(neighbor);
+                    let mut new_visited = visited.clone();
+                    new_visited.insert(neighbor);
+                    stack.push((neighbor, new_path, new_visited));
+                }
+            }
+        }
+        all_routes
     }
 
     /// Finds a route through a network.
@@ -550,7 +659,9 @@ impl RoutingPlan {
             } else if i >= first_crossover_index && i < second_crossover_index {
                 routes.push(second_route.clone());
             } else {
-                panic!("Other indices should never be reached");
+                // let new_route = Self::route_crossover(rng, first_route.clone(), second_route.clone());
+                // routes.push(new_route);
+                panic!("Should not be reached")
             }
         }
         Self { routes }
@@ -613,6 +724,21 @@ impl CapacityPlan {
         Self {
             planned_capacity_types,
         }
+    }
+
+    fn exhaustive(capacity_types: &CapacityTypes, links_demands: &Vec<f64>) -> Vec<Self> {
+        let mut capacity_plans = Vec::new();
+        for capacity_types in repeat_n(
+            capacity_types.capacity_types.iter().cloned(),
+            links_demands.len(),
+        )
+        .multi_cartesian_product()
+        {
+            capacity_plans.push(Self {
+                planned_capacity_types: capacity_types,
+            });
+        }
+        capacity_plans
     }
 
     fn ensure_capacity_sufficient(&mut self, links_demands: &Vec<f64>, problem: &Rofa) {
@@ -702,6 +828,20 @@ pub struct RoutingAndCapacityPlan {
 }
 
 impl RoutingAndCapacityPlan {
+    fn from(
+        routing_plan: RoutingPlan,
+        capacity_plan: CapacityPlan,
+        links_demands: Vec<f64>,
+    ) -> Self {
+        Self {
+            routing_plan,
+            capacity_plan,
+            links_demands,
+            id: 0,
+            parent_ids: None,
+        }
+    }
+
     fn random(problem: &Rofa) -> Self {
         let routing_plan = RoutingPlan::random_from_demands(&problem.network, &problem.demands);
         let links_demands = Self::calculate_links_demands(problem, &routing_plan);
@@ -716,6 +856,17 @@ impl RoutingAndCapacityPlan {
             id,
             parent_ids,
         }
+    }
+
+    pub fn exhaustive(problem: Rofa) -> impl Iterator<Item = Self> {
+        let routing_plans = RoutingPlan::exhaustive_and_length(&problem.network, &problem.demands);
+        routing_plans.into_iter().flat_map(move |routing_plan| {
+            let links_demands = Self::calculate_links_demands(&problem, &routing_plan);
+            let capacity_plans = CapacityPlan::exhaustive(&problem.capacity_types, &links_demands);
+            capacity_plans.into_iter().map(move |capacity_plan| {
+                Self::from(routing_plan.clone(), capacity_plan, links_demands.clone())
+            })
+        })
     }
 
     pub fn get_links_demands(&self) -> Vec<f64> {

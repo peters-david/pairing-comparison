@@ -69,6 +69,8 @@ pub fn statistics_plot(props: &StatisticsPlotProps) -> Html {
     let data = use_state(|| None::<Vec<Trace>>);
     let layout = Layout {
         title: None,
+        width: 1200,
+        height: 600,
         margins: Margins {
             l: 0,
             r: 0,
@@ -196,6 +198,8 @@ struct Layout {
     xaxis: Axis,
     yaxis: Axis,
     legend: Font,
+    width: usize,
+    height: usize,
 }
 
 #[derive(Clone, Serialize, PartialEq)]

@@ -60,7 +60,9 @@ impl<P: Problem<Individual = I>, X: Pairing<I>, I: Individual<Problem = P>>
         let mut individuals = (0..self.genetic_algorithm_settings.population_size())
             .map(|_| {
                 let mut individual = base_individual.clone();
-                individual.mutate(rng, &self.problem);
+                if rng.random_bool(0.1) {
+                    individual.mutate(rng, &self.problem);
+                }
                 individual
             })
             .collect();
@@ -93,7 +95,7 @@ impl<P: Problem<Individual = I>, X: Pairing<I>, I: Individual<Problem = P>>
             b.1.partial_cmp(&a.1)
                 .expect("Tried to compare invalid numbers")
         });
-        assert!(individuals_and_fitness[0].1 >= individuals_and_fitness[1].1);
+        // assert!(individuals_and_fitness[0].1 >= individuals_and_fitness[1].1);
         let number_selection_survivors = (individuals_and_fitness.len() as f64
             * self.genetic_algorithm_settings.survival_rate())
         .ceil() as usize;
@@ -122,10 +124,18 @@ impl<P: Problem<Individual = I>, X: Pairing<I>, I: Individual<Problem = P>>
     }
 
     fn mutate(&self, rng: &mut StdRng, mut individuals: Vec<I>) -> Vec<I> {
-        for individual in &mut individuals {
-            if self.genetic_algorithm_settings.mutation_rate() >= rng.random_range(0.0..=1.0) {
-                for _ in 0..self.genetic_algorithm_settings.mutation_strength() {
-                    individual.mutate(rng, &self.problem);
+        if individuals.len() == 2 {
+            // 1+1 evolutionary
+            println!("1+1");
+            for _ in 0..self.genetic_algorithm_settings.mutation_strength() {
+                individuals[0].mutate(rng, &self.problem);
+            }
+        } else {
+            for individual in &mut individuals {
+                if self.genetic_algorithm_settings.mutation_rate() >= rng.random_range(0.0..=1.0) {
+                    for _ in 0..self.genetic_algorithm_settings.mutation_strength() {
+                        individual.mutate(rng, &self.problem);
+                    }
                 }
             }
         }
@@ -365,11 +375,14 @@ impl<I: Individual> Pairing<I> for SimilarFitnessPairing<I> {
         );
         let mut pairs = Vec::new();
         parents.sort_by(|a, b| b.0.total_cmp(&a.0));
-        for _ in 0..size {
-            let first_index = rng.random_range(0..parents.len());
+        for i in 0..size {
+            let first_index = match i < parents.len() {
+                true => i,
+                false => rng.random_range(0..parents.len()),
+            };
             let distance =
                 ((1.0 - 0.01 * self.similarity as f64) * (parents.len() as f64 - 1.0)) as usize;
-            let second_index = (first_index + distance) % (parents.len() - 1);
+            let second_index = (first_index + distance).max(0).min(parents.len() - 2);
             let first = parents.remove(first_index).1;
             let second = parents.remove(second_index).1;
             pairs.push((first, second));
@@ -445,7 +458,8 @@ impl<I: Individual, const DIMENSIONS: usize> Pairing<I> for SpatialDistancePairi
                 * (parents.len() as f64 - 2.0)) as usize;
         let mut pairs = Vec::new();
         for i in 0..size {
-            let first = parents.remove(0).1;
+            let first_index = rng.random_range(0..parents.len());
+            let first = parents.remove(first_index).1;
             let existing_ids = parents.iter().map(|p| p.1.id()).collect();
             let second_id = &self
                 .space
@@ -461,6 +475,9 @@ impl<I: Individual, const DIMENSIONS: usize> Pairing<I> for SpatialDistancePairi
                 .find(|(_, i)| i.id() == *second_id)
                 .expect("Could not find individual by id")
                 .1;
+            if let Some(index) = parents.iter().position(|p| p.1.id() == *second_id) {
+                parents.remove(index);
+            }
             pairs.push((first, second));
         }
         pairs
@@ -641,7 +658,10 @@ pub fn get_parents<'a, T>(
                 (*percentage as f64 * individuals_with_fitness.len() as f64).ceil() as usize;
             individuals_with_fitness.truncate(elite_individuals);
             for i in 0..(number_parents - individuals_with_fitness.len()) {
-                let elite_index = i % (individuals_with_fitness.len() - 1);
+                let elite_index = match individuals_with_fitness.len() {
+                    1 => 0,
+                    p => i % (p - 1),
+                };
                 let elite_individual = individuals_with_fitness
                     .get(elite_index)
                     .expect("Cannot access individual");

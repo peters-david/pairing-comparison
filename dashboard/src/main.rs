@@ -36,10 +36,31 @@ fn app() -> Html {
     html! {
         <div>
             <h1>{"Dashboard"}</h1>
-            <h3>{"Two"}</h3>
-            <StaticPlot run_id={".twoxxxxxxxxxxx".to_string()} description_flags={DescriptionFlags::from(true, false, false)} />
-            <h3>{"One"}</h3>
-            <StaticPlot run_id={".onexxxxxxxxxxx".to_string()} description_flags={DescriptionFlags::from(true, false, false)} />
+            <h3>{"E1"}</h3>
+            <StaticPlot run_id={".e1xxxxxxxxxxxx".to_string()} description_flags={DescriptionFlags::from(true, false, false)} />
+            <h3>{"E2"}</h3>
+            <StaticPlot run_id={".e2xxxxxxxxxxxx".to_string()} description_flags={DescriptionFlags::from(true, false, false)} />
+            <h3>{"E3"}</h3>
+            <StaticPlot run_id={".e3xxxxxxxxxxxx".to_string()} description_flags={DescriptionFlags::from(true, false, false)} />
+            <h3>{"E4"}</h3>
+            <StaticPlot run_id={".e4xxxxxxxxxxxx".to_string()} description_flags={DescriptionFlags::from(true, false, false)} />
+            <h3>{"E5a"}</h3>
+            <StaticPlot run_id={".e5axxxxxxxxxxx".to_string()} description_flags={DescriptionFlags::from(true, false, false)} />
+            <h3>{"E5b"}</h3>
+            <StaticPlot run_id={".e5bxxxxxxxxxxx".to_string()} description_flags={DescriptionFlags::from(true, false, false)} />
+            <h3>{"E6a"}</h3>
+            <StaticPlot run_id={".e6axxxxxxxxxxx".to_string()} description_flags={DescriptionFlags::from(true, false, false)} />
+            <h3>{"E6b"}</h3>
+            <StaticPlot run_id={".e6bxxxxxxxxxxx".to_string()} description_flags={DescriptionFlags::from(true, false, false)} />
+            <h3>{"E7"}</h3>
+            <StaticPlot run_id={".e7xxxxxxxxxxxx".to_string()} description_flags={DescriptionFlags::from(true, false, false)} />
+            <h3>{"E8a (b is exhaustive)"}</h3>
+            <StaticPlot run_id={".e8axxxxxxxxxxx".to_string()} description_flags={DescriptionFlags::from(true, false, false)} />
+            <h3>{"E9 is table"}</h3>
+            <h3>{"E10"}</h3>
+            <StaticPlot run_id={".e10xxxxxxxxxxx".to_string()} description_flags={DescriptionFlags::from(true, false, false)} />
+            <h3>{"E11"}</h3>
+            <StaticPlot run_id={".e11xxxxxxxxxxx".to_string()} description_flags={DescriptionFlags::from(true, false, false)} />
             {
                 if let Some(r) = &*runs {
                     html! {

@@ -106,6 +106,8 @@ struct EvaluatedTraces {
     median_of_max: Vec<f64>,
     average_of_max: Vec<f64>,
     max_of_max: Vec<f64>,
+
+    step_average_of_max: Vec<f64>,
 }
 
 impl EvaluatedTraces {
@@ -137,6 +139,7 @@ impl EvaluatedTraces {
         let median_of_max = Self::median_trace(&transposed_maximums);
         let average_of_max = Self::average_trace(&transposed_maximums);
         let max_of_max = Self::maximum_trace(&transposed_maximums);
+        let step_average_of_max = Self::step(average_of_max.clone());
 
         Self {
             min_of_min,
@@ -153,6 +156,7 @@ impl EvaluatedTraces {
             median_of_max,
             average_of_max,
             max_of_max,
+            step_average_of_max,
         }
     }
 
@@ -198,6 +202,16 @@ impl EvaluatedTraces {
             ("average of max".to_string(), self.average_of_max.clone()),
             ("max of max".to_string(), self.max_of_max.clone()),
         ]
+    }
+
+    fn step(trace: Vec<f64>) -> Vec<f64> {
+        let mut new = Vec::new();
+        let mut max = f64::MIN;
+        for v in trace {
+            max = v.max(max);
+            new.push(max)
+        }
+        new
     }
 
     fn minimum_trace(fitness_by_generations: &Vec<Vec<f64>>) -> Vec<f64> {
