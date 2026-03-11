@@ -117,7 +117,7 @@ impl Sequence {
     fn get_surrounding_numbers(&self, number: usize) -> (usize, usize) {
         let size = self.len();
         let number_index = self.get_index_of_number(number);
-        let previous_index = (number_index + size - 1) % (size - 1); // TODO: wrapper?
+        let previous_index = (number_index + size - 1) % (size - 1);
         let following_index = (number_index + 1) % (size - 1);
         let previous_number = self.get_number_at_index(previous_index);
         let following_number = self.get_number_at_index(following_index);
@@ -194,7 +194,6 @@ impl Individual for Sequence {
 
     fn mutate(&mut self, rng: &mut StdRng, problem: &Cities) {
         if 0.01 >= rng.random_range(0.0..1.0) {
-            // TODO: mutation rate from settings
             let swap_indices = (0..self.len()).choose_multiple(rng, 2);
             self.numbers.swap(swap_indices[0], swap_indices[1]);
         }

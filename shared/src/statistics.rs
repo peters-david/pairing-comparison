@@ -1,6 +1,7 @@
 use crate::math::{quantile_from_sorted, transpose};
 use crate::settings::{GeneticAlgorithmSettings, PairingSettings, ProblemSettings};
 use serde::{Deserialize, Serialize};
+use statrs::distribution::{ContinuousCDF, StudentsT};
 use std::{
     fs::{File, create_dir_all},
     io::Write,
@@ -24,23 +25,118 @@ impl DescriptionFlags {
 }
 
 #[derive(PartialEq, Serialize, Deserialize, Clone, Debug)]
+pub struct TValues {
+    n: usize,
+    m: f64,
+    v: f64,
+}
+
+impl TValues {
+    pub fn from(statistics: Statistics) -> Self {
+        let values = statistics.last_n_mean();
+        let n: usize = values.len();
+        let m: f64 = values.iter().sum::<f64>() / n as f64;
+        let v: f64 = values.iter().map(|v| (v - m).powi(2)).sum::<f64>() / (n as f64 - 1.0);
+        Self { n, m, v }
+    }
+}
+
+#[derive(PartialEq, Serialize, Deserialize, Clone, Debug)]
 pub struct EvaluatedStatistics {
     genetic_algorithm_settings: GeneticAlgorithmSettings,
     problem_settings: ProblemSettings,
     pairing_settings: PairingSettings,
     evaluated_traces: EvaluatedTraces,
+    t_values: TValues,
 }
 
 impl EvaluatedStatistics {
+    pub fn t_test_all(evaluated_statistics: &Vec<Self>) -> Vec<String> {
+        let mut results = Vec::new();
+        for i in 0..evaluated_statistics.len() {
+            for j in (i + 1)..evaluated_statistics.len() {
+                let first = &evaluated_statistics[i];
+                let second = &evaluated_statistics[j];
+                let result = Self::t_test_single(first, second);
+                results.extend(result);
+            }
+        }
+        results
+    }
+
+    pub fn t_test_single(first: &Self, second: &Self) -> Vec<String> {
+        let f = &first.t_values;
+        let s = &second.t_values;
+
+        let n1 = f.n as f64;
+        let n2 = s.n as f64;
+
+        let m1 = f.m;
+        let m2 = s.m;
+
+        let v1 = f.v;
+        let v2 = s.v;
+
+        // Welch t statistic
+        let t = (m1 - m2) / ((v1 / n1 + v2 / n2).sqrt());
+
+        // Degrees of freedom Welch Satterthwaite
+        let df = (v1 / n1 + v2 / n2).powi(2)
+            / ((v1 / n1).powi(2) / (n1 - 1.0) + (v2 / n2).powi(2) / (n2 - 1.0));
+
+        // t distribution
+        let dist = StudentsT::new(0.0, 1.0, df).expect("Could not create t distribution");
+
+        // two-tailed p
+        let p = 2.0 * (1.0 - dist.cdf(t.abs()));
+        let p_string = match p < 0.001 {
+            true => "<0.001".to_string(),
+            false => format!("{:.3}", p),
+        };
+
+        let alpha = 0.05;
+
+        let cohens_d_star = (m1 - m2) / (((v1 + v2) / 2.0).sqrt());
+
+        let result = match p <= alpha {
+            true => "reject",
+            false => "accept",
+        };
+
+        let first_name = first.settings_description(&DescriptionFlags::from(true, false, false));
+        let second_name = second.settings_description(&DescriptionFlags::from(true, false, false));
+
+        vec![format!(
+            "\\({}\\)&\\({}\\)&{:.3}&{:.3}&{:.3}&{:.3}&{}&{}&{:.3}\\\\",
+            first_name
+                .replace("%", "\\%")
+                .replace("<", "\\langle{}")
+                .replace(">", "\\rangle{}"),
+            second_name
+                .replace("%", "\\%")
+                .replace("<", "\\langle{}")
+                .replace(">", "\\rangle{}"),
+            m1,
+            m2,
+            t,
+            df,
+            p_string,
+            result,
+            cohens_d_star.abs(),
+        )]
+    }
+
     pub fn from(statistics: Statistics) -> Self {
         let (genetic_algorithm_settings, problem_settings, pairing_settings) =
             statistics.settings();
-        let evaluated_traces = EvaluatedTraces::from(statistics);
+        let evaluated_traces = EvaluatedTraces::from(statistics.clone());
+        let t_values = TValues::from(statistics);
         Self {
             genetic_algorithm_settings,
             problem_settings,
             pairing_settings,
             evaluated_traces,
+            t_values,
         }
     }
 
@@ -257,6 +353,32 @@ pub struct Statistics {
 impl Statistics {
     pub fn from(statistics: Vec<Statistic>) -> Self {
         Self { statistics }
+    }
+
+    pub fn last_n(&self) -> Vec<Vec<f64>> {
+        let mut last = Vec::new();
+        for statistic in &self.statistics {
+            let length = statistic.generations_fitness.len();
+            let last_n: Vec<f64> = statistic
+                .generations_fitness
+                .iter()
+                .map(|f| f.lower_quartile_median_higher_quartile().1)
+                .skip(length - 3)
+                .collect();
+            assert!(last_n.len() == 3, "Incorrect number of last values");
+            last.push(last_n);
+        }
+        last
+    }
+
+    pub fn last_n_mean(&self) -> Vec<f64> {
+        let last_n = self.last_n();
+        let mut last_n_mean = Vec::new();
+        for n in last_n {
+            let mean = n.iter().sum::<f64>() / n.len() as f64;
+            last_n_mean.push(mean);
+        }
+        last_n_mean
     }
 
     pub fn settings(&self) -> (GeneticAlgorithmSettings, ProblemSettings, PairingSettings) {

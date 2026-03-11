@@ -89,14 +89,13 @@ impl<P: Problem<Individual = I>, X: Pairing<I>, I: Individual<Problem = P>>
             .into_iter()
             .enumerate()
             .map(|(i, individual)| (i, self.problem.fitness(&individual), individual))
-            .collect(); // TODO: extra data structure not neccessary, but may be in the future
+            .collect();
         let fitness_values = individuals_and_fitness.iter().map(|(_, f, _)| *f).collect();
         self.statistic.append_fitness_values(fitness_values);
         individuals_and_fitness.sort_by(|a, b| {
             b.1.partial_cmp(&a.1)
                 .expect("Tried to compare invalid numbers")
         });
-        // assert!(individuals_and_fitness[0].1 >= individuals_and_fitness[1].1);
         let number_selection_survivors = (individuals_and_fitness.len() as f64
             * self.genetic_algorithm_settings.survival_rate())
         .ceil() as usize;
@@ -193,7 +192,6 @@ pub enum ConstructedPairing {
     RofaPairing(Pairings<RoutingAndCapacityPlan>),
 }
 
-// TODO: this feels wrong, but seems to be the best choice in rust
 impl<I: Individual> Pairing<I> for Pairings<I> {
     fn pairing_settings(&self) -> PairingSettings {
         match self {

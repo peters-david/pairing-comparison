@@ -9,10 +9,9 @@ use std::{
     sync::Arc,
 };
 
-use chrono::Local;
 use clap::Parser;
-use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
-use itertools::{iproduct, Itertools};
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use itertools::iproduct;
 use rand::{rngs::StdRng, SeedableRng};
 use threadpool::ThreadPool;
 
@@ -38,18 +37,18 @@ struct Args {
 }
 
 fn main() {
-    // e1();
+    e1();
     e2();
     e3();
     e4();
-    // e5a();
-    // e5b();
-    // e6a();
-    // e6b();
-    // e7();
-    // e8();
-    // e10();
-    // e11();
+    e5a();
+    e5b();
+    e6a();
+    e6b();
+    e7();
+    e8();
+    e10();
+    e11();
 }
 
 fn e1() {
@@ -68,22 +67,7 @@ fn e1() {
 
     let mut pairing_settings = Vec::new();
     for i_q in individual_quantities {
-        pairing_settings.extend(vec![
-            // PairingSettings::AsexualPairing { quantity: i_q },
-            PairingSettings::RandomPairing { quantity: i_q },
-        ]);
-        // for s in (20..=20).step_by(5) {
-        //     pairing_settings.push(PairingSettings::SimilarFitnessPairing {
-        //         quantity: i_q,
-        //         similarity: s,
-        //     });
-        // }
-        // for d_i_d_p in 20..=20 {
-        //     pairing_settings.push(PairingSettings::SpatialDistancePairing {
-        //         quantity: i_q,
-        //         desired_individual_distance_percentage: d_i_d_p,
-        //     });
-        // }
+        pairing_settings.extend(vec![PairingSettings::RandomPairing { quantity: i_q }]);
     }
 
     run(
@@ -97,16 +81,7 @@ fn e1() {
 fn e2() {
     let cfa_settings = (vec![25], vec![30], vec![20], vec![15]);
     let ga_settings = (vec![(100, 2000)], vec![0.5], vec![0.01], vec![1]);
-    let mut individual_quantities = vec![
-        IndividualQuantity::Random,
-        // IndividualQuantity::FitnessProportionate,
-    ];
-    for p in [5] {
-        // individual_quantities.extend(vec![
-        //     IndividualQuantity::Elite { percentage: p },
-        //     IndividualQuantity::AntiElite { percentage: p },
-        // ]);
-    }
+    let mut individual_quantities = vec![IndividualQuantity::Random];
 
     let mut pairing_settings = Vec::new();
     for i_q in individual_quantities {
@@ -139,29 +114,11 @@ fn e2() {
 fn e3() {
     let cfa_settings = (vec![25], vec![30], vec![20], vec![15]);
     let ga_settings = (vec![(100, 2000)], vec![0.5], vec![0.01], vec![1]);
-    let mut individual_quantities = vec![
-        IndividualQuantity::Random,
-        // IndividualQuantity::FitnessProportionate,
-    ];
-    for p in [5] {
-        // individual_quantities.extend(vec![
-        //     IndividualQuantity::Elite { percentage: p },
-        //     IndividualQuantity::AntiElite { percentage: p },
-        // ]);
-    }
+    let mut individual_quantities = vec![IndividualQuantity::Random];
 
     let mut pairing_settings = Vec::new();
     for i_q in individual_quantities {
-        pairing_settings.extend(vec![
-            // PairingSettings::AsexualPairing { quantity: i_q },
-            // PairingSettings::RandomPairing { quantity: i_q },
-        ]);
-        // for s in (20..=20).step_by(5) {
-        //     pairing_settings.push(PairingSettings::SimilarFitnessPairing {
-        //         quantity: i_q,
-        //         similarity: s,
-        //     });
-        // }
+        pairing_settings.extend(vec![]);
         for d_i_d_p in (10..=100).step_by(10) {
             pairing_settings.push(PairingSettings::SpatialDistancePairing {
                 quantity: i_q,
@@ -181,35 +138,17 @@ fn e3() {
 fn e4() {
     let cfa_settings = (vec![25], vec![30], vec![20], vec![15]);
     let ga_settings = (vec![(100, 2000)], vec![0.5], vec![0.01], vec![1]);
-    let mut individual_quantities = vec![
-        IndividualQuantity::Random,
-        // IndividualQuantity::FitnessProportionate,
-    ];
-    for p in [5] {
-        // individual_quantities.extend(vec![
-        //     IndividualQuantity::Elite { percentage: p },
-        //     IndividualQuantity::AntiElite { percentage: p },
-        // ]);
-    }
+    let mut individual_quantities = vec![IndividualQuantity::Random];
 
     let mut pairing_settings = Vec::new();
     for i_q in individual_quantities {
-        pairing_settings.extend(vec![
-            // PairingSettings::AsexualPairing { quantity: i_q },
-            // PairingSettings::RandomPairing { quantity: i_q },
-        ]);
+        pairing_settings.extend(vec![]);
         for s in (10..=100).step_by(10) {
             pairing_settings.push(PairingSettings::SimilarFitnessPairing {
                 quantity: i_q,
                 similarity: s,
             });
         }
-        // for d_i_d_p in (10..=100).step_by(10) {
-        //     pairing_settings.push(PairingSettings::SpatialDistancePairing {
-        //         quantity: i_q,
-        //         desired_individual_distance_percentage: d_i_d_p,
-        //     });
-        // }
     }
 
     run(
@@ -223,16 +162,7 @@ fn e4() {
 fn e5a() {
     let cfa_settings = (vec![25], vec![30], vec![20], vec![15]);
     let ga_settings = (vec![(100, 3000)], vec![0.9], vec![0.01], vec![1]);
-    let mut individual_quantities = vec![
-        IndividualQuantity::Random,
-        // IndividualQuantity::FitnessProportionate,
-    ];
-    for p in [5] {
-        // individual_quantities.extend(vec![
-        //     IndividualQuantity::Elite { percentage: p },
-        //     IndividualQuantity::AntiElite { percentage: p },
-        // ]);
-    }
+    let mut individual_quantities = vec![IndividualQuantity::Random];
 
     let mut pairing_settings = Vec::new();
     for i_q in individual_quantities {
@@ -265,16 +195,7 @@ fn e5a() {
 fn e5b() {
     let cfa_settings = (vec![25], vec![30], vec![20], vec![15]);
     let ga_settings = (vec![(100, 3000)], vec![0.1], vec![0.01], vec![1]);
-    let mut individual_quantities = vec![
-        IndividualQuantity::Random,
-        // IndividualQuantity::FitnessProportionate,
-    ];
-    for p in [5] {
-        // individual_quantities.extend(vec![
-        //     IndividualQuantity::Elite { percentage: p },
-        //     IndividualQuantity::AntiElite { percentage: p },
-        // ]);
-    }
+    let mut individual_quantities = vec![IndividualQuantity::Random];
 
     let mut pairing_settings = Vec::new();
     for i_q in individual_quantities {
@@ -307,16 +228,7 @@ fn e5b() {
 fn e6a() {
     let cfa_settings = (vec![10], vec![30], vec![20], vec![15]);
     let ga_settings = (vec![(100, 2000)], vec![0.5], vec![0.01], vec![1]);
-    let mut individual_quantities = vec![
-        IndividualQuantity::Random,
-        // IndividualQuantity::FitnessProportionate,
-    ];
-    for p in [5] {
-        // individual_quantities.extend(vec![
-        //     IndividualQuantity::Elite { percentage: p },
-        //     IndividualQuantity::AntiElite { percentage: p },
-        // ]);
-    }
+    let mut individual_quantities = vec![IndividualQuantity::Random];
 
     let mut pairing_settings = Vec::new();
     for i_q in individual_quantities {
@@ -349,16 +261,7 @@ fn e6a() {
 fn e6b() {
     let cfa_settings = (vec![50], vec![30], vec![20], vec![15]);
     let ga_settings = (vec![(100, 2000)], vec![0.5], vec![0.01], vec![1]);
-    let mut individual_quantities = vec![
-        IndividualQuantity::Random,
-        // IndividualQuantity::FitnessProportionate,
-    ];
-    for p in [5] {
-        // individual_quantities.extend(vec![
-        //     IndividualQuantity::Elite { percentage: p },
-        //     IndividualQuantity::AntiElite { percentage: p },
-        // ]);
-    }
+    let mut individual_quantities = vec![IndividualQuantity::Random];
 
     let mut pairing_settings = Vec::new();
     for i_q in individual_quantities {
@@ -391,16 +294,7 @@ fn e6b() {
 fn e7() {
     let cfa_settings = (vec![100], vec![30], vec![20], vec![15]);
     let ga_settings = (vec![(50, 100)], vec![0.5], vec![0.01], vec![1]);
-    let mut individual_quantities = vec![
-        IndividualQuantity::Random,
-        // IndividualQuantity::FitnessProportionate,
-    ];
-    for p in [5] {
-        // individual_quantities.extend(vec![
-        //     IndividualQuantity::Elite { percentage: p },
-        //     IndividualQuantity::AntiElite { percentage: p },
-        // ]);
-    }
+    let mut individual_quantities = vec![IndividualQuantity::Random];
 
     let mut pairing_settings = Vec::new();
     for i_q in individual_quantities {
@@ -433,16 +327,7 @@ fn e7() {
 fn e8() {
     let cfa_settings = (vec![4], vec![100], vec![100], vec![3]);
     let ga_settings = (vec![(20, 100)], vec![0.5], vec![0.01], vec![1]);
-    let mut individual_quantities = vec![
-        IndividualQuantity::Random,
-        // IndividualQuantity::FitnessProportionate,
-    ];
-    for p in [5] {
-        // individual_quantities.extend(vec![
-        //     IndividualQuantity::Elite { percentage: p },
-        //     IndividualQuantity::AntiElite { percentage: p },
-        // ]);
-    }
+    let mut individual_quantities = vec![IndividualQuantity::Random];
 
     let mut pairing_settings = Vec::new();
     for i_q in individual_quantities {
@@ -476,10 +361,7 @@ fn e8() {
 fn e9() {
     let cfa_settings = (vec![25], vec![30], vec![20], vec![15]);
     let ga_settings = (vec![(100, 2000)], vec![0.5], vec![0.01], vec![1]);
-    let mut individual_quantities = vec![
-        // IndividualQuantity::Random,
-        // IndividualQuantity::FitnessProportionate,
-    ];
+    let mut individual_quantities = vec![];
     for p in [100] {
         individual_quantities.extend(vec![
             IndividualQuantity::Elite { percentage: p },
@@ -518,35 +400,14 @@ fn e9() {
 fn e10() {
     let cfa_settings = (vec![25], vec![30], vec![20], vec![15]);
     let ga_settings = (vec![(1, 200000)], vec![1.0], vec![1.0], vec![100]);
-    let mut individual_quantities = vec![
-        // IndividualQuantity::Random,
-        // IndividualQuantity::FitnessProportionate,
-    ];
+    let mut individual_quantities = vec![];
     for p in [100] {
-        individual_quantities.extend(vec![
-            IndividualQuantity::Elite { percentage: p },
-            //     IndividualQuantity::AntiElite { percentage: p },
-        ]);
+        individual_quantities.extend(vec![IndividualQuantity::Elite { percentage: p }]);
     }
 
     let mut pairing_settings = Vec::new();
     for i_q in individual_quantities {
-        pairing_settings.extend(vec![
-            PairingSettings::AsexualPairing { quantity: i_q },
-            // PairingSettings::RandomPairing { quantity: i_q },
-        ]);
-        // for s in (50..=50).step_by(40) {
-        //     pairing_settings.push(PairingSettings::SimilarFitnessPairing {
-        //         quantity: i_q,
-        //         similarity: s,
-        //     });
-        // }
-        // for d_i_d_p in (50..=50).step_by(40) {
-        //     pairing_settings.push(PairingSettings::SpatialDistancePairing {
-        //         quantity: i_q,
-        //         desired_individual_distance_percentage: d_i_d_p,
-        //     });
-        // }
+        pairing_settings.extend(vec![PairingSettings::AsexualPairing { quantity: i_q }]);
     }
 
     run(
@@ -559,36 +420,15 @@ fn e10() {
 
 fn e11() {
     let cfa_settings = (vec![25], vec![30], vec![20], vec![15]);
-    let ga_settings = (vec![(2, 200000)], vec![0.4], vec![0.1], vec![1]);
-    let mut individual_quantities = vec![
-        // IndividualQuantity::Random,
-        // IndividualQuantity::FitnessProportionate,
-    ];
+    let ga_settings = (vec![(2, 200000)], vec![0.4], vec![0.1], vec![2]);
+    let mut individual_quantities = vec![];
     for p in [100] {
-        individual_quantities.extend(vec![
-            IndividualQuantity::Elite { percentage: p },
-            //     IndividualQuantity::AntiElite { percentage: p },
-        ]);
+        individual_quantities.extend(vec![IndividualQuantity::Elite { percentage: p }]);
     }
 
     let mut pairing_settings = Vec::new();
     for i_q in individual_quantities {
-        pairing_settings.extend(vec![
-            PairingSettings::AsexualPairing { quantity: i_q },
-            // PairingSettings::RandomPairing { quantity: i_q },
-        ]);
-        // for s in (50..=50).step_by(40) {
-        //     pairing_settings.push(PairingSettings::SimilarFitnessPairing {
-        //         quantity: i_q,
-        //         similarity: s,
-        //     });
-        // }
-        // for d_i_d_p in (50..=50).step_by(40) {
-        //     pairing_settings.push(PairingSettings::SpatialDistancePairing {
-        //         quantity: i_q,
-        //         desired_individual_distance_percentage: d_i_d_p,
-        //     });
-        // }
+        pairing_settings.extend(vec![PairingSettings::AsexualPairing { quantity: i_q }]);
     }
 
     run(
@@ -605,7 +445,6 @@ fn run(
     ga_settings: (Vec<(usize, usize)>, Vec<f64>, Vec<f64>, Vec<usize>),
     pairing_settings: Vec<PairingSettings>,
 ) {
-    // print!("\x1B[2J\x1B[1;1H"); // clear
     while run_id.len() < 14 {
         run_id.push('x');
     }
@@ -673,6 +512,7 @@ fn run(
     let m = Arc::new(MultiProgress::with_draw_target(
         indicatif::ProgressDrawTarget::stderr_with_hz(8),
     ));
+    // uncomment to disable progress bar
     // m.set_draw_target(ProgressDrawTarget::hidden());
     let style = ProgressStyle::with_template("{msg:<15} [{bar:100.cyan/blue}] {pos}/{len} ({eta})")
         .expect("Could not create progress bar style");

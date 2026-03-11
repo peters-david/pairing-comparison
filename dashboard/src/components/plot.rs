@@ -33,6 +33,15 @@ pub fn result_files_plot(props: &ResultFilesPlotProps) -> Html {
     html! {
         if let Some(s) = &*statistics {
             <StatisticsPlot name={props.name.clone()} all_statistics={s.clone()} description_flags={props.description_flags.clone()}/>
+            {
+                for EvaluatedStatistics::t_test_all(s).iter().map(|i| html!{
+                    <>
+                        {i}
+                        <br/>
+                    </>
+                })
+            }
+            <h3>{"-------------------"}</h3>
         } else {
             <h3>{"No data in result files plot"}</h3>
         }

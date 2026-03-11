@@ -110,11 +110,11 @@ impl BidirectionalLink {
     }
 }
 
-//TODO: handle other type
+// if unidirectional links are required
 struct UnidirectionalLink {}
 enum Link {}
 
-//TODO: handle other type
+// if unidirectional demands are required
 struct UnidirectionalDemand {}
 enum Demand {}
 
@@ -152,7 +152,7 @@ impl BidirectionalDemand {
                 rng.random_range(0..number_nodes),
                 rng.random_range(0..number_nodes),
             );
-            //TODO: this is a bad idea, edge cases can take a long time
+            // edge cases may take a long time
             while between.0 == between.1
                 || demands
                     .iter()
@@ -197,7 +197,7 @@ impl Network {
         );
         let nodes = (0..number_nodes).map(Node::with_id).collect();
         let mut links = BidirectionalLink::random_links(rng, &nodes, number_links);
-        //TODO: this is a bad idea, edge cases can take a long time
+        // edge cases may take a long time
         while !Self::coherent(&nodes, &links) {
             links = BidirectionalLink::random_links(rng, &nodes, number_links);
             todo!()
@@ -457,7 +457,6 @@ impl Rofa {
         let delay_cost =
             (unweighted_delay_cost / (number_links as f64)).powf(DELAY_SCALING_EXPONENT);
 
-        // println!("{}/{}/{}", delay_cost, fixed_cost, variable_cost); // TODO
         delay_cost + fixed_cost + variable_cost
     }
 }
@@ -658,8 +657,6 @@ impl RoutingPlan {
             } else if i >= first_crossover_index && i < second_crossover_index {
                 routes.push(second_route.clone());
             } else {
-                // let new_route = Self::route_crossover(rng, first_route.clone(), second_route.clone());
-                // routes.push(new_route);
                 panic!("Should not be reached")
             }
         }
@@ -694,7 +691,7 @@ impl RoutingPlan {
         let mut first_part = Self::any_route(&problem.network, first, intermediate);
         let second_part = Self::any_route(&problem.network, intermediate, second);
         first_part.pop();
-        //TODO if first_part.contains check for duplicates
+        // may check for duplicates in the future
         let mut mutated_route = Vec::new();
         mutated_route.extend(first_part);
         mutated_route.extend(second_part);
@@ -917,7 +914,6 @@ impl Individual for RoutingAndCapacityPlan {
 
     fn mutate(&mut self, rng: &mut StdRng, problem: &Self::Problem) {
         self.routing_plan.mutate(rng, problem);
-        self.links_demands = Self::calculate_links_demands(problem, &self.routing_plan);
         self.capacity_plan
             .mutate(rng, self.get_links_demands(), problem);
         self.capacity_plan
